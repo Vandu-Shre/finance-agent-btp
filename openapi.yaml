@@ -1,0 +1,433 @@
+openapi: 3.0.3
+info:
+  title: Finance Agent API
+  description: |
+    AI-powered finance agent application with real-time chat capabilities,
+    intelligent document processing, and semantic search using Azure OpenAI and ChromaDB.
+
+    ## Features
+    - 💬 Real-time WebSocket chat with streaming responses
+    - 📄 PDF document upload and vectorization
+    - 🔍 Semantic search with ChromaDB
+    - 🤖 Azure OpenAI integration (GPT-4 & embeddings)
+
+    ## Authentication
+    Currently unauthenticated for demo purposes.
+    Future plans include IAS + XSUAA OAuth 2.0 integration.
+
+  version: 1.0.0
+  contact:
+    name: Finance Agent Support
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:3001
+    description: Local Development
+  - url: http://localhost:5001
+    description: Local with Approuter
+  - url: https://finance-agent-approuter.cfapps.sap.hana.ondemand.com
+    description: Production (SAP BTP)
+
+tags:
+  - name: health
+    description: Health check and service status
+  - name: files
+    description: File upload and management
+  - name: chat
+    description: WebSocket-based real-time chat (see WebSocket documentation)
+
+paths:
+  /:
+    get:
+      summary: API Welcome
+      description: Welcome message and API information
+      tags:
+        - health
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Welcome to the Finance Agent API
+
+  /health:
+    get:
+      summary: Health Check
+      description: |
+        Check the health status of the application and its dependencies.
+        Returns status of AI agent initialization and vector store readiness.
+      tags:
+        - health
+      responses:
+        '200':
+          description: Health check successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - timestamp
+                  - services
+                properties:
+                  status:
+                    type: string
+                    enum: [OK]
+                    example: OK
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2024-03-29T10:30:45.123Z'
+                  services:
+                    type: object
+                    properties:
+                      agent:
+                        type: string
+                        enum: [ready, not ready]
+                        description: AI agent initialization status
+                        example: ready
+                      vectorStore:
+                        type: string
+                        enum: [ready, not ready]
+                        description: ChromaDB vector store status
+                        example: ready
+                      initializing:
+                        type: boolean
+                        description: Whether initialization is in progress
+                        example: false
+
+  /api/files:
+    post:
+      summary: Upload File
+      description: |
+        Upload a PDF document for processing and indexing.
+
+        The file is:
+        1. Validated (must be PDF, max 10MB)
+        2. Processed and text extracted
+        3. Vectorized and indexed in ChromaDB
+        4. Made available for semantic search in chat
+
+        **Note:** File is stored in memory only (Cloud Foundry compatible).
+      tags:
+        - files
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file to upload (max 10MB)
+      responses:
+        '200':
+          description: File uploaded and indexed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File uploaded and indexed successfully
+                  file:
+                    $ref: '#/components/schemas/FileInfo'
+        '400':
+          description: Bad request - no file uploaded or invalid file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: No file uploaded
+        '500':
+          description: Server error during upload or indexing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to upload file
+
+    get:
+      summary: List Files
+      description: Get a list of all uploaded files with metadata
+      tags:
+        - files
+      responses:
+        '200':
+          description: List of files retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FileInfo'
+        '500':
+          description: Server error retrieving file list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to list files
+
+  /api/files/{filename}:
+    delete:
+      summary: Delete File
+      description: |
+        Delete a specific file by filename.
+
+        This removes the file from memory and adds a system message
+        to the chat history indicating the deletion.
+      tags:
+        - files
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The name of the file to delete
+          example: financial-report-2024.pdf
+      responses:
+        '200':
+          description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File deleted successfully
+        '400':
+          description: Bad request - filename not provided or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Filename is required
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: File not found
+        '500':
+          description: Server error during deletion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to delete file
+
+  /api/chat:
+    get:
+      summary: WebSocket Chat Connection
+      description: |
+        **WebSocket Endpoint** - Not a standard HTTP GET endpoint.
+
+        Establishes a WebSocket connection for real-time bidirectional chat.
+
+        ## WebSocket Protocol
+
+        ### Connection
+        ```javascript
+        const ws = new WebSocket('ws://localhost:3001/api/chat');
+        ```
+
+        ### Client → Server Messages
+
+        **Send Chat Message:**
+        ```json
+        {
+          "type": "message",
+          "content": "What is the total revenue?"
+        }
+        ```
+
+        **Clear Chat History:**
+        ```json
+        {
+          "type": "clear"
+        }
+        ```
+
+        ### Server → Client Messages
+
+        **Streaming Response (during generation):**
+        ```json
+        {
+          "type": "content",
+          "content": "chunk of text"
+        }
+        ```
+
+        **Complete Response:**
+        ```json
+        {
+          "type": "message",
+          "role": "assistant",
+          "content": "complete response text",
+          "timestamp": "2024-03-29T10:30:45.123Z"
+        }
+        ```
+
+        **Chat History:**
+        ```json
+        {
+          "type": "history",
+          "messages": [
+            {
+              "role": "user",
+              "content": "question",
+              "timestamp": "2024-03-29T10:30:45.123Z"
+            }
+          ]
+        }
+        ```
+
+        **System Message:**
+        ```json
+        {
+          "type": "system",
+          "content": "File uploaded: report.pdf",
+          "timestamp": "2024-03-29T10:30:45.123Z"
+        }
+        ```
+
+        **Error Message:**
+        ```json
+        {
+          "type": "error",
+          "content": "error description"
+        }
+        ```
+
+        ## Features
+        - Real-time streaming responses
+        - Message history management
+        - File upload notifications
+        - Automatic reconnection support
+        - Context-aware conversations using uploaded documents
+
+      tags:
+        - chat
+      responses:
+        '101':
+          description: Switching Protocols - WebSocket connection established
+        '400':
+          description: Bad Request - Not a WebSocket upgrade request
+
+components:
+  schemas:
+    FileInfo:
+      type: object
+      required:
+        - filename
+        - originalName
+        - size
+        - mimetype
+        - uploadedAt
+      properties:
+        filename:
+          type: string
+          description: Generated unique filename
+          example: 1711699845123-financial-report.pdf
+        originalName:
+          type: string
+          description: Original filename from upload
+          example: financial-report.pdf
+        size:
+          type: integer
+          description: File size in bytes
+          example: 524288
+        mimetype:
+          type: string
+          description: MIME type of the file
+          example: application/pdf
+        uploadedAt:
+          type: string
+          format: date-time
+          description: Timestamp of when the file was uploaded
+          example: '2024-03-29T10:30:45.123Z'
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: An error occurred
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+        - timestamp
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system]
+          description: Message sender role
+          example: assistant
+        content:
+          type: string
+          description: Message content
+          example: Based on the document, the total revenue is $1.2M
+        timestamp:
+          type: string
+          format: date-time
+          description: Message timestamp
+          example: '2024-03-29T10:30:45.123Z'
+
+  securitySchemes:
+    # Future: OAuth 2.0 with IAS + XSUAA
+    oauth2:
+      type: oauth2
+      description: |
+        **Planned for future releases**
+
+        OAuth 2.0 authentication with SAP Identity Authentication Service (IAS)
+        and XSUAA for production deployments.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://your-tenant.authentication.sap.hana.ondemand.com/oauth/authorize
+          tokenUrl: https://your-tenant.authentication.sap.hana.ondemand.com/oauth/token
+          scopes:
+            read: Read access to resources
+            write: Write access to resources
+        clientCredentials:
+          tokenUrl: https://your-tenant.authentication.sap.hana.ondemand.com/oauth/token
+          scopes:
+            api: API access for service-to-service communication
+
+# Future: Apply security to all endpoints
+# security:
+#   - oauth2: [read, write]
+
+externalDocs:
+  description: Finance Agent GitHub Repository
+  url: https://github.com/your-org/finance-agent

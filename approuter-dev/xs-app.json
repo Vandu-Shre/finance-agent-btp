@@ -1,0 +1,30 @@
+{
+  "authenticationMethod": "none",
+  "routes": [
+    {
+      "source": "^/api/chat/stream$",
+      "target": "/api/chat/stream",
+      "destination": "backend",
+      "authenticationType": "none",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/api/(.*)$",
+      "target": "/api/$1",
+      "destination": "backend",
+      "authenticationType": "none",
+      "csrfProtection": false
+    },
+    {
+      "source": "^(.*)$",
+      "target": "$1",
+      "destination": "frontend",
+      "authenticationType": "none",
+      "csrfProtection": false,
+      "cacheControl": "no-cache, no-store, must-revalidate"
+    }
+  ],
+  "websockets": {
+    "enabled": true
+  }
+}

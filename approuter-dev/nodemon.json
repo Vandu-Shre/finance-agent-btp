@@ -1,0 +1,12 @@
+{
+  "watch": [
+    "xs-app.json",
+    "default-env.json"
+  ],
+  "ext": "json",
+  "ignore": [
+    "node_modules/**",
+    "package-lock.json"
+  ],
+  "exec": "node node_modules/@sap/approuter/approuter.js"
+}

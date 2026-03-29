@@ -1,0 +1,15 @@
+{
+  "name": "finance-agent-approuter",
+  "version": "1.0.0",
+  "description": "Application Router for Finance Agent (Production)",
+  "scripts": {
+    "start": "node node_modules/@sap/approuter/approuter.js"
+  },
+  "dependencies": {
+    "@sap/approuter": "^17.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

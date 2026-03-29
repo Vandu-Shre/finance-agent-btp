@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="coinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FFC700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFB800;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main coin circle -->
+  <circle cx="32" cy="32" r="28" fill="url(#coinGradient)"/>
+
+  <!-- Coin border -->
+  <circle cx="32" cy="32" r="28" fill="none" stroke="#CC9900" stroke-width="2"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#FFED4E" stroke-width="1" opacity="0.6"/>
+
+  <!-- Dollar sign $ -->
+  <g fill="#1B5E20">
+    <!-- Vertical line -->
+    <rect x="30" y="16" width="4" height="32" rx="1"/>
+
+    <!-- S curve - top half -->
+    <path d="M 24 22 C 24 19 26 17 30 17 L 38 17 C 40 17 42 18 42 20 C 42 22 40 23 38 23 L 26 23 C 24 23 22 24 22 26 C 22 28 24 29 26 29 L 38 29 C 42 29 46 31 46 35 C 46 39 42 41 38 41 L 26 41 C 24 41 22 40 22 38"
+          fill="none"
+          stroke="#1B5E20"
+          stroke-width="5"
+          stroke-linecap="round"/>
+  </g>
+
+  <!-- Shine effect -->
+  <ellipse cx="22" cy="20" rx="6" ry="4" fill="white" opacity="0.35" transform="rotate(-30 22 20)"/>
+</svg>

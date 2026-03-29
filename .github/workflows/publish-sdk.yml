@@ -1,0 +1,86 @@
+name: Publish SDK to NPM
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'sdk/**'
+      - '.github/workflows/publish-sdk.yml'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: sdk/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix sdk
+
+      - name: Run tests with coverage
+        run: npm run test:coverage --prefix sdk
+
+      - name: Check coverage thresholds
+        run: |
+          cd sdk
+          COVERAGE=$(node -e "
+            const coverage = require('./coverage/coverage-summary.json');
+            const total = coverage.total;
+            const lines = total.lines.pct;
+            console.log(lines);
+          ")
+          THRESHOLD=50
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "❌ SDK line coverage ($COVERAGE%) is below threshold ($THRESHOLD%)"
+            exit 1
+          fi
+          echo "✅ SDK coverage meets threshold (${THRESHOLD}%)"
+
+      - name: Build SDK
+        run: npm run build --prefix sdk
+
+      - name: Check if version already published
+        id: check-version
+        run: |
+          cd sdk
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
+            echo "Version $PACKAGE_VERSION already published"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $PACKAGE_VERSION not published yet"
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to NPM
+        if: steps.check-version.outputs.should_publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd sdk
+          npm publish --access public
+
+      - name: Create Git tag
+        if: steps.check-version.outputs.should_publish == 'true'
+        run: |
+          cd sdk
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "sdk-v$PACKAGE_VERSION" -m "SDK version $PACKAGE_VERSION"
+          git push origin "sdk-v$PACKAGE_VERSION"

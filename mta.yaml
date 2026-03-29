@@ -1,0 +1,100 @@
+_schema-version: "3.1"
+ID: finance-agent
+version: 1.0.0
+description: Finance Agent - Full-stack application with WebSocket chat and file management
+
+parameters:
+  enable-parallel-deployments: true
+  keep-existing-routes: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci --prefix frontend
+        - npm run build --prefix frontend
+        - mkdir -p approuter/resources
+        - bash -c "cp -r frontend/dist/* approuter/resources/"
+  after-all:
+    - builder: custom
+      commands:
+        - npm install --prefix backend
+
+modules:
+  # Application Router (Reverse Proxy + Static Frontend)
+  - name: finance-agent-approuter
+    type: approuter.nodejs
+    path: approuter
+    parameters:
+      disk-quota: 512M
+      memory: 512M
+      instances: 1
+    properties:
+      TENANT_HOST_PATTERN: "^(.*)-${default-uri}"
+    requires:
+      - name: backend-api
+        group: destinations
+        properties:
+          name: backend
+          url: ~{url}
+          forwardAuthToken: false
+    provides:
+      - name: approuter-url
+        properties:
+          url: ${default-url}
+
+  # Backend Service
+  - name: finance-agent-backend
+    type: nodejs
+    path: backend
+    parameters:
+      disk-quota: 1G
+      memory: 512M
+      instances: 1
+    build-parameters:
+      builder: npm
+      ignore:
+        - uploads/
+        - coverage/
+        - src/
+        - __tests__/
+        - "*.test.ts"
+        - "*.spec.ts"
+        - "*.md"
+        - "tsconfig.json"
+        - "jest.config.cjs"
+    properties:
+      NODE_ENV: production
+      # Azure OpenAI Configuration (non-secret)
+      AZURE_OPENAI_ENDPOINT: https://ra-foundry-exp.openai.azure.com/
+      AZURE_OPENAI_DEPLOYMENT_NAME: gpt-5-nano
+      AZURE_OPENAI_API_VERSION: 2025-01-01-preview
+      AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME: text-embedding-3-small
+      # Chroma Cloud Configuration (non-secret)
+      CHROMA_TENANT: 0adc3910-4d84-40c0-977d-b09490eb677c
+      CHROMA_DATABASE: dev
+      CHROMA_COLLECTION_NAME: finance-docs
+      # API keys (AZURE_OPENAI_API_KEY, CHROMA_API_KEY) are fetched at runtime
+      # from BTP Credential Store namespace: finance-agent
+    requires:
+      - name: finance-agent-credstore
+      - name: finance-agent-db
+    provides:
+      - name: backend-api
+        properties:
+          url: ${default-url}
+
+resources:
+  - name: finance-agent-credstore
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: credstore
+      service-plan: trial
+      update-service: false
+
+  - name: finance-agent-db
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: postgresql-db
+      service-plan: trial
+      update-service: false

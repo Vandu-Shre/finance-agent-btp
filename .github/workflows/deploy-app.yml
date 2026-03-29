@@ -1,0 +1,151 @@
+name: Build and Deploy to Cloud Foundry
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "approuter/**"
+      - "backend/**"
+      - "frontend/**"
+      - "mta.yaml"
+      - ".mtaignore"
+      - ".github/workflows/deploy-app.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+            approuter/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix backend
+          npm ci --prefix approuter
+
+      - name: Run frontend tests with coverage
+        run: npm run test:coverage --prefix frontend
+
+      - name: Check frontend coverage thresholds
+        run: |
+          cd frontend
+          COVERAGE=$(node -e "
+            const coverage = require('./coverage/coverage-summary.json');
+            const total = coverage.total;
+            const lines = total.lines.pct;
+            const statements = total.statements.pct;
+            const functions = total.functions.pct;
+            const branches = total.branches.pct;
+            console.log(JSON.stringify({ lines, statements, functions, branches }));
+          ")
+          echo "Frontend Coverage: $COVERAGE"
+
+          LINES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).lines)")
+          THRESHOLD=50
+          if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
+            echo "❌ Frontend line coverage ($LINES%) is below threshold ($THRESHOLD%)"
+            exit 1
+          fi
+          echo "✅ Frontend coverage meets threshold (${THRESHOLD}%)"
+
+      - name: Run backend tests with coverage
+        run: npm run test:coverage --prefix backend
+
+      - name: Check backend coverage thresholds
+        run: |
+          cd backend
+          COVERAGE=$(node -e "
+            const coverage = require('./coverage/coverage-summary.json');
+            const total = coverage.total;
+            const lines = total.lines.pct;
+            console.log(lines);
+          ")
+          THRESHOLD=50
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "❌ Backend line coverage ($COVERAGE%) is below threshold ($THRESHOLD%)"
+            exit 1
+          fi
+          echo "✅ Backend coverage meets threshold (${THRESHOLD}%)"
+
+      - name: Build frontend
+        run: npm run build --prefix frontend
+
+      - name: Build backend
+        run: npm run build --prefix backend
+
+      - name: Install MultiApps CF CLI Plugin
+        run: |
+          wget -q -O - https://github.com/cloudfoundry/cli/releases/download/v8.7.10/cf8-cli-installer_8.7.10_x86-64.deb > /tmp/cf-cli.deb
+          sudo dpkg -i /tmp/cf-cli.deb
+          cf install-plugin -f https://github.com/cloudfoundry/multiapps-cli-plugin/releases/latest/download/multiapps-plugin.linux64
+
+      - name: Install MTA Build Tool
+        run: |
+          MBT_URL=$(curl -s https://api.github.com/repos/SAP/cloud-mta-build-tool/releases/latest \
+            | grep "browser_download_url.*Linux_amd64.tar.gz" \
+            | cut -d '"' -f 4)
+          wget -q -O /tmp/mbt.tar.gz "$MBT_URL"
+          mkdir -p $HOME/bin
+          tar -xzf /tmp/mbt.tar.gz -C $HOME/bin
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Build MTA archive
+        run: mbt build -p=cf
+
+      - name: Upload MTA archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: mta-archive
+          path: mta_archives/*.mtar
+          retention-days: 7
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download MTA archive
+        uses: actions/download-artifact@v4
+        with:
+          name: mta-archive
+          path: mta_archives
+
+      - name: Install Cloud Foundry CLI
+        run: |
+          wget -q -O - https://github.com/cloudfoundry/cli/releases/download/v8.7.10/cf8-cli-installer_8.7.10_x86-64.deb > /tmp/cf-cli.deb
+          sudo dpkg -i /tmp/cf-cli.deb
+
+      - name: Install MultiApps CF CLI Plugin
+        run: cf install-plugin -f https://github.com/cloudfoundry/multiapps-cli-plugin/releases/latest/download/multiapps-plugin.linux64
+
+      - name: Login to Cloud Foundry
+        env:
+          CF_API: ${{ secrets.CF_API }}
+          CF_USERNAME: ${{ secrets.CF_USERNAME }}
+          CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+          CF_ORG: ${{ secrets.CF_ORG }}
+          CF_SPACE: ${{ secrets.CF_SPACE }}
+        run: |
+          cf api "$CF_API"
+          cf auth "$CF_USERNAME" "$CF_PASSWORD"
+          cf target -o "$CF_ORG" -s "$CF_SPACE"
+
+      - name: Deploy to Cloud Foundry
+        run: |
+          MTAR_FILE=$(ls mta_archives/*.mtar | head -n 1)
+          cf deploy "$MTAR_FILE" -f

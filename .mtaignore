@@ -1,0 +1,52 @@
+# Development files
+approuter-dev/
+*.md
+.gitignore
+.git/
+
+# Dependencies (will be installed during build)
+**/node_modules/
+**/package-lock.json
+
+# Build artifacts (will be generated during build)
+backend/dist/
+backend/coverage/
+backend/.nyc_output/
+frontend/dist/
+frontend/coverage/
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+**/coverage/
+
+# Source maps (optional - exclude for smaller package)
+**/*.map
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Environment files
+.env
+.env.*
+default-env.json
+
+# Uploads (don't deploy local uploads)
+backend/uploads/*
+
+# MTA build output
+mta_archives/
+.mta_*
