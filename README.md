@@ -19,7 +19,7 @@ Finance Agent is an intelligent chatbot application designed for financial docum
 - 🚀 **Cloud Deployment** - SAP BTP Cloud Foundry support with MTA deployment
 - 🧪 **Comprehensive Testing** - Jest integration with coverage reporting
 - 🤖 **CI/CD Pipeline** - GitHub Actions for automated testing and deployment
-- 📦 **SDK Support** - Reusable TypeScript SDK (`@vandanashree/finance-agent`) for client applications
+- 📦 **SDK Support** - Reusable TypeScript SDK (`@vs-fas/finance-agent`) and Python SDK (`vs-finance-agent-sdk`) for client applications
 
 ## 📁 Project Structure
 

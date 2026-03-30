@@ -5,7 +5,7 @@ TypeScript/JavaScript SDK for interacting with the Finance Agent API.
 ## Installation
 
 ```bash
-npm install @vandanashree/finance-agent
+npm install @vs-fas/finance-agent
 ```
 
 ## Usage
@@ -13,7 +13,7 @@ npm install @vandanashree/finance-agent
 ### Initialize the SDK
 
 ```typescript
-import FinanceAgentSDK from "@vandanashree/finance-agent";
+import FinanceAgentSDK from "@vs-fas/finance-agent";
 
 const client = new FinanceAgentSDK({
   baseUrl: "https://your-app.cfapps.eu10.hana.ondemand.com",
@@ -108,7 +108,7 @@ client.chat.disconnect();
 ### Complete Example
 
 ```typescript
-import FinanceAgentSDK from "@vandanashree/finance-agent";
+import FinanceAgentSDK from "@vs-fas/finance-agent";
 
 async function main() {
   // Initialize SDK

@@ -1,5 +1,5 @@
 {
-  "name": "@vandanashree/finance-agent",
+  "name": "@vs-fas/finance-agent",
   "version": "1.0.0",
   "description": "TypeScript SDK for Finance Agent API",
   "main": "dist/index.js",
