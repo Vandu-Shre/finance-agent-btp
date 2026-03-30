@@ -2,7 +2,7 @@
 import FinanceAgentSDK, { type FileInfo, type Session, type Message } from '../src/index.js';
 
 // After publishing to npm/GitHub Packages, use:
-// import FinanceAgentSDK, { type FileInfo, type Session, type Message } from '@vandanashree/sdk';
+// import FinanceAgentSDK, { type FileInfo, type Session, type Message } from '@vandanashree/finance-agent';
 
 /**
  * Example usage of the Finance Agent SDK

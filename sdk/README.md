@@ -5,7 +5,7 @@ TypeScript/JavaScript SDK for interacting with the Finance Agent API.
 ## Installation
 
 ```bash
-npm install @vandanashree/sdk
+npm install @vandanashree/finance-agent
 ```
 
 ## Usage
@@ -13,10 +13,10 @@ npm install @vandanashree/sdk
 ### Initialize the SDK
 
 ```typescript
-import FinanceAgentSDK from '@vandanashree/sdk';
+import FinanceAgentSDK from "@vandanashree/finance-agent";
 
 const client = new FinanceAgentSDK({
-  baseUrl: 'https://your-app.cfapps.eu10.hana.ondemand.com',
+  baseUrl: "https://your-app.cfapps.eu10.hana.ondemand.com",
 });
 ```
 
@@ -29,14 +29,14 @@ const client = new FinanceAgentSDK({
 const fileInput = document.querySelector('input[type="file"]');
 const file = fileInput.files[0];
 const result = await client.files.uploadFile(file);
-console.log('Uploaded:', result.file);
+console.log("Uploaded:", result.file);
 
 // Node.js
-import fs from 'fs';
-const buffer = fs.readFileSync('./document.pdf');
+import fs from "fs";
+const buffer = fs.readFileSync("./document.pdf");
 const result = await client.files.uploadFile({
   buffer,
-  filename: 'document.pdf'
+  filename: "document.pdf",
 });
 ```
 
@@ -44,13 +44,13 @@ const result = await client.files.uploadFile({
 
 ```typescript
 const files = await client.files.getFiles();
-console.log('Files:', files);
+console.log("Files:", files);
 ```
 
 #### Delete a File
 
 ```typescript
-const message = await client.files.deleteFile('stored-filename.pdf');
+const message = await client.files.deleteFile("stored-filename.pdf");
 console.log(message); // "File deleted successfully"
 ```
 
@@ -61,22 +61,22 @@ console.log(message); // "File deleted successfully"
 ```typescript
 await client.chat.connect({
   onConnected: (session) => {
-    console.log('Connected to session:', session.sessionId);
+    console.log("Connected to session:", session.sessionId);
   },
   onAgentMessage: (message) => {
-    console.log('Agent says:', message.text);
+    console.log("Agent says:", message.text);
   },
   onUserMessage: (message) => {
-    console.log('User says:', message.text);
+    console.log("User says:", message.text);
   },
   onTypingStart: () => {
-    console.log('Agent is typing...');
+    console.log("Agent is typing...");
   },
   onTypingStop: () => {
-    console.log('Agent stopped typing');
+    console.log("Agent stopped typing");
   },
   onError: (error) => {
-    console.error('Chat error:', error);
+    console.error("Chat error:", error);
   },
 });
 ```
@@ -84,7 +84,7 @@ await client.chat.connect({
 #### Send a Message
 
 ```typescript
-client.chat.sendMessage('Hello, how can you help me?');
+client.chat.sendMessage("Hello, how can you help me?");
 ```
 
 #### Get All Messages
@@ -108,27 +108,27 @@ client.chat.disconnect();
 ### Complete Example
 
 ```typescript
-import FinanceAgentSDK from '@vandanashree/sdk';
+import FinanceAgentSDK from "@vandanashree/finance-agent";
 
 async function main() {
   // Initialize SDK
   const client = new FinanceAgentSDK({
-    baseUrl: 'https://your-app.cfapps.eu10.hana.ondemand.com',
+    baseUrl: "https://your-app.cfapps.eu10.hana.ondemand.com",
   });
 
   // Connect to chat
   await client.chat.connect({
     onAgentMessage: (message) => {
-      console.log('Agent:', message.text);
+      console.log("Agent:", message.text);
     },
   });
 
   // Send a message
-  client.chat.sendMessage('What files do I have?');
+  client.chat.sendMessage("What files do I have?");
 
   // List files
   const files = await client.files.getFiles();
-  console.log('Available files:', files.length);
+  console.log("Available files:", files.length);
 
   // Disconnect when done
   setTimeout(() => {
@@ -152,6 +152,7 @@ new FinanceAgentSDK(config: FinanceAgentConfig)
 ```
 
 **Config options:**
+
 - `baseUrl` (required): Base URL of the Finance Agent API
 - `headers` (optional): Custom headers
 
