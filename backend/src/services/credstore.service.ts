@@ -65,6 +65,22 @@ async function fetchCredential(binding: CredstoreBinding, namespace: string, nam
   return Buffer.from(data.value, 'base64').toString('utf-8');
 }
 
+export async function getCredential(namespace: string, name: string): Promise<string | null> {
+  const binding = getBinding();
+
+  if (!binding) {
+    const envVar = CREDENTIAL_MAP[name];
+    return envVar ? (process.env[envVar] ?? null) : null;
+  }
+
+  try {
+    return await fetchCredential(binding, namespace, name);
+  } catch (error) {
+    console.error(`❌ Failed to fetch credential '${name}' from Credential Store:`, error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 export async function loadCredentials(namespace: string): Promise<void> {
   const binding = getBinding();
 

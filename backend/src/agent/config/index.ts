@@ -1,11 +1,12 @@
 import { config } from 'dotenv';
+import { getCredential } from '../../services/credstore.service.js';
 
 // Load environment variables
 config();
 
 export const agentConfig = {
   azure: {
-    apiKey: process.env.AZURE_OPENAI_API_KEY || '',
+    apiKey: '',
     apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
     endpoint: process.env.AZURE_OPENAI_ENDPOINT || '',
 
@@ -19,17 +20,14 @@ export const agentConfig = {
   },
   chroma: {
     // Chroma Cloud configuration (uses CloudClient)
-    apiKey: process.env.CHROMA_API_KEY || '',
+    apiKey: '',
     tenant: process.env.CHROMA_TENANT || 'default_tenant',
     database: process.env.CHROMA_DATABASE || 'default_database',
     collectionName: process.env.CHROMA_COLLECTION_NAME || 'finance-docs',
   },
 };
 
-// Validate required configuration
-if (!agentConfig.azure.apiKey) {
-  throw new Error('AZURE_OPENAI_API_KEY is required. Please set it in .env file.');
-}
+// Validate required configuration (non-secret fields)
 if (!agentConfig.azure.endpoint) {
   throw new Error('AZURE_OPENAI_ENDPOINT is required. Please set it in .env file.');
 }
@@ -40,17 +38,32 @@ if (!agentConfig.azure.embeddingDeploymentName) {
   throw new Error('AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME is required. Please set it in .env file (this is your embedding model for document search).');
 }
 
-// Validate Chroma configuration
-if (!agentConfig.chroma.apiKey) {
-  throw new Error('CHROMA_API_KEY is required when using Chroma Cloud. Please set it in .env file.');
+const CREDSTORE_NAMESPACE = 'finance-agent';
+
+export async function initConfig(): Promise<void> {
+  const azureApiKey = await getCredential(CREDSTORE_NAMESPACE, 'azure-openai-api-key');
+  if (azureApiKey) {
+    agentConfig.azure.apiKey = azureApiKey;
+  }
+
+  const chromaApiKey = await getCredential(CREDSTORE_NAMESPACE, 'chroma-api-key');
+  if (chromaApiKey) {
+    agentConfig.chroma.apiKey = chromaApiKey;
+  }
+
+  if (!agentConfig.azure.apiKey) {
+    throw new Error('Azure OpenAI API key is required. Ensure it is stored in BTP Credential Store under "azure-openai-api-key".');
+  }
+  if (!agentConfig.chroma.apiKey) {
+    throw new Error('Chroma API key is required. Ensure it is stored in BTP Credential Store under "chroma-api-key".');
+  }
+
+  console.log('✅ Using Chroma Cloud for persistent vector storage');
+  console.log('📝 Configuration loaded:');
+  console.log(`  - Chat Model: ${agentConfig.azure.deploymentName}`);
+  console.log(`  - Embedding Model: ${agentConfig.azure.embeddingDeploymentName}`);
+  console.log(`  - Endpoint: ${agentConfig.azure.endpoint}`);
+  console.log(`  - Chroma Tenant: ${agentConfig.chroma.tenant}`);
+  console.log(`  - Chroma Database: ${agentConfig.chroma.database}`);
+  console.log(`  - Chroma Collection: ${agentConfig.chroma.collectionName}`);
 }
-console.log('✅ Using Chroma Cloud for persistent vector storage');
-
-console.log('📝 Configuration loaded:');
-console.log(`  - Chat Model: ${agentConfig.azure.deploymentName}`);
-console.log(`  - Embedding Model: ${agentConfig.azure.embeddingDeploymentName}`);
-console.log(`  - Endpoint: ${agentConfig.azure.endpoint}`);
-console.log(`  - Chroma Tenant: ${agentConfig.chroma.tenant}`);
-console.log(`  - Chroma Database: ${agentConfig.chroma.database}`);
-console.log(`  - Chroma Collection: ${agentConfig.chroma.collectionName}`);
-

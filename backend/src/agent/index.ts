@@ -1,7 +1,7 @@
 import { FinanceAgent } from './agents/finance-agent.js';
 
 export { FinanceAgent };
-export { agentConfig } from './config/index.js';
+export { agentConfig, initConfig } from './config/index.js';
 export {
   initializeVectorStore,
   indexDocumentFromBuffer,

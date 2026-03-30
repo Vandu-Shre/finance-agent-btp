@@ -1,15 +1,9 @@
 import 'dotenv/config';
-import { loadCredentials } from './services/credstore.service.js';
+import { initConfig } from './agent/config/index.js';
 import { initDb } from './services/db.service.js';
 
-const CREDSTORE_NAMESPACE = 'finance-agent';
-
 async function start(): Promise<void> {
-  // Fetch API keys from BTP Credential Store before any module (config) is loaded.
-  // Dynamic import of app is intentional — config/index.ts validates env vars at
-  // module load time, so credentials must be in process.env first.
-  await loadCredentials(CREDSTORE_NAMESPACE);
-
+  await initConfig();
   await initDb();
 
   const { default: app } = await import('./app.js');
