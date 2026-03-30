@@ -71,7 +71,7 @@ modules:
       AZURE_OPENAI_API_VERSION: 2025-01-01-preview
       AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME: text-embedding-3-small
       # Chroma Cloud Configuration (non-secret)
-      CHROMA_TENANT: 0adc3910-4d84-40c0-977d-b09490eb677c
+      CHROMA_TENANT: 331db5df-e7e9-41fb-b02e-6b2d3ada34ad
       CHROMA_DATABASE: dev
       CHROMA_COLLECTION_NAME: finance-docs
       # API keys (AZURE_OPENAI_API_KEY, CHROMA_API_KEY) are fetched at runtime
