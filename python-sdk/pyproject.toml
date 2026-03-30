@@ -6,6 +6,9 @@ build-backend = "hatchling.build"
 name = "vs-finance-agent-sdk"
 version = "0.1.0"
 description = "Python SDK for the Finance Agent API (chat & file management)"
+readme = "README.md"
+license = { text = "MIT" }
+keywords = ["finance-agent", "sdk", "api", "websocket"]
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27.0",
