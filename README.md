@@ -9,16 +9,17 @@ Finance Agent is an intelligent chatbot application designed for financial docum
 ### Key Features
 
 - 💬 **Real-time WebSocket Chat** - Instant bi-directional communication with streaming responses
-- 📄 **Document Upload & Processing** - PDF upload with intelligent text extraction and vectorization
-- 🧠 **AI-Powered Responses** - Azure OpenAI integration with GPT-4 and embedding models
-- 🔍 **Vector Search** - ChromaDB integration for semantic document search and retrieval
+- 📄 **Document Upload & Processing** - PDF, CSV, JSON, and plain-text upload with intelligent text extraction and vectorization
+- 🧠 **AI-Powered Responses** - Azure OpenAI integration with GPT and embedding models
+- 🔍 **Vector Search** - ChromaDB Cloud integration for semantic document search and retrieval, scoped per session
+- 🗄️ **PostgreSQL Persistence** - Sessions, messages, and file metadata stored durably in a managed PostgreSQL database
+- 🔑 **BTP Credential Store** - API keys fetched securely at runtime from SAP BTP Credential Store; no secrets in environment variables or code
 - 🎨 **Modern UI** - SAP UI5 Web Components with React for enterprise-grade UX
 - 📋 **OpenAPI 3.0 Specification** - Complete REST API documentation with interactive Swagger UI
 - 🚀 **Cloud Deployment** - SAP BTP Cloud Foundry support with MTA deployment
 - 🧪 **Comprehensive Testing** - Jest integration with coverage reporting
 - 🤖 **CI/CD Pipeline** - GitHub Actions for automated testing and deployment
-- 📦 **SDK Support** - Reusable TypeScript SDK for client applications
-- 🔐 **No Authentication** - Simplified for demo purposes (can be easily enabled)
+- 📦 **SDK Support** - Reusable TypeScript SDK (`@vandanashree/finance-agent`) for client applications
 
 ## 📁 Project Structure
 
@@ -73,6 +74,8 @@ finance-agent/
 - npm 9+
 - Azure OpenAI account (for chat and embeddings)
 - ChromaDB Cloud account (for vector storage)
+- PostgreSQL database (for session/message/file persistence)
+- SAP BTP Credential Store binding (for production; `.env` fallback for local dev)
 
 ### Environment Setup
 
@@ -96,7 +99,18 @@ finance-agent/
    CHROMA_TENANT=your_tenant
    CHROMA_DATABASE=your_database
    CHROMA_COLLECTION_NAME=finance-docs
+
+   # PostgreSQL Configuration
+   DATABASE_URL=postgres://user:password@localhost:5432/finance_agent
+   # Or use individual variables:
+   # PGHOST=localhost
+   # PGPORT=5432
+   # PGDATABASE=finance_agent
+   # PGUSER=your_user
+   # PGPASSWORD=your_password
    ```
+
+   In production on SAP BTP, Azure OpenAI and ChromaDB API keys are fetched automatically from the bound Credential Store service — no manual env var setup needed for those.
 
    See `docs/ENVIRONMENT_VARIABLES.md` for detailed configuration guide.
 
@@ -167,17 +181,24 @@ npm start
                    │  │   (LangChain)       │  │
                    │  └──────────┬──────────┘  │
                    │             │              │
-                   │    ┌────────┴────────┐    │
-                   │    │                 │    │
-                   │    ▼                 ▼    │
-                   │  ┌──────┐      ┌─────────┐│
-                   │  │Vector│      │ Azure   ││
-                   │  │Store │      │ OpenAI  ││
-                   │  │      │      │         ││
-                   │  │Chroma│      │ • GPT-4 ││
-                   │  │ DB   │      │ • Embed ││
-                   │  └──────┘      └─────────┘│
-                   └───────────────────────────┘
+                   │    ┌───────────────────┐    │
+                   │    │                   │    │
+                   │    ▼       ▼      ▼    ▼    │
+                   │  ┌──────┐ ┌────┐ ┌─────────┐│
+                   │  │Vector│ │ PG │ │ Azure   ││
+                   │  │Store │ │ DB │ │ OpenAI  ││
+                   │  │      │ │    │ │         ││
+                   │  │Chroma│ │Sess│ │ • GPT-4 ││
+                   │  │ DB   │ │Msg │ │ • Embed ││
+                   │  └──────┘ └────┘ └─────────┘│
+                   │                             │
+                   │  ┌─────────────────────┐    │
+                   │  │  BTP Credential     │    │
+                   │  │  Store              │    │
+                   │  │  (API keys at       │    │
+                   │  │   runtime)          │    │
+                   │  └─────────────────────┘    │
+                   └─────────────────────────────┘
 ```
 
 ### Component Details
@@ -200,6 +221,8 @@ npm start
   - LangChain for agent orchestration
   - Azure OpenAI for chat completions and embeddings
   - ChromaDB for vector storage and similarity search
+- **Persistence**: PostgreSQL via `pg` connection pool — sessions, messages, and file metadata stored in `sessions`, `messages`, and `files` tables; also supports BTP VCAP_SERVICES binding for managed PostgreSQL
+- **Credential Management**: BTP Credential Store integration — API keys fetched securely at runtime via the CredStore REST API; falls back to environment variables when BTP binding is not present
 - **Testing**: Jest with comprehensive test coverage
 
 #### AI Agent (LangChain)
@@ -255,10 +278,10 @@ Coverage reports are generated in `coverage/` directories.
 
 #### Quick Deployment
 
-> **💡 Future Production Enhancements**:
-> - **BTP Credential Store** integration planned for secure credential management
-> - **IAS + XSUAA authentication** planned for production deployments
-> - See [Security](#-security) section for detailed roadmap and architecture
+> **💡 Production Notes**:
+> - **BTP Credential Store** is integrated — credentials are fetched securely at runtime via the bound credstore service
+> - **IAS + XSUAA authentication** planned for future deployments
+> - See [Security](#-security) section for details
 
 See `docs/DEPLOYMENT.md` for comprehensive guide.
 
@@ -292,13 +315,21 @@ SAP BTP Cloud Foundry
 │   ├── Routes /api/* to backend
 │   └── WebSocket proxying
 │
-└── finance-agent-backend (512MB, 1GB disk)
-    ├── Express API
-    ├── WebSocket server
-    ├── AI agent
-    └── External connections:
-        ├── Azure OpenAI (via API)
-        └── ChromaDB Cloud (via API)
+├── finance-agent-backend (512MB, 1GB disk)
+│   ├── Express API
+│   ├── WebSocket server
+│   ├── AI agent
+│   └── External connections:
+│       ├── Azure OpenAI (via API)
+│       ├── ChromaDB Cloud (via API)
+│       ├── PostgreSQL (via VCAP_SERVICES binding)
+│       └── BTP Credential Store (via VCAP_SERVICES binding)
+│
+├── finance-agent-db (PostgreSQL managed service)
+│   └── Stores sessions, messages, file metadata
+│
+└── finance-agent-credstore (Credential Store managed service)
+    └── Stores Azure OpenAI and ChromaDB API keys
 ```
 
 No authentication services are configured (simplified for demo purposes).
@@ -448,6 +479,8 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
 - **CORS** - Cross-origin support
 - **Swagger UI** - Interactive API documentation
 - **OpenAPI 3.0** - API specification standard
+- **pg** - PostgreSQL client with connection pooling
+- **BTP Credential Store** - Runtime secret management via VCAP_SERVICES
 
 ### AI & ML Stack
 - **LangChain** - AI orchestration framework
@@ -486,24 +519,28 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
 
 ### Backend Configuration
 
-> **📋 Future Enhancement**: For production deployments on SAP BTP, integration with **BTP Credential Store** is planned for secure credential management instead of environment variables. See the [Security](#-security) section for the planned architecture.
-
-**Current Development Setup** (using environment variables):
-
 Key environment variables (see `backend/.env.example`):
 
 ```bash
-# Azure OpenAI
+# Azure OpenAI (loaded from BTP Credential Store in production; env var fallback for local dev)
 AZURE_OPENAI_API_KEY=           # Your Azure OpenAI API key
 AZURE_OPENAI_ENDPOINT=          # Azure OpenAI endpoint URL
 AZURE_OPENAI_DEPLOYMENT_NAME=   # Chat model deployment (e.g., gpt-4o)
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=  # Embedding model
 
-# Chroma DB
+# Chroma DB (API key loaded from BTP Credential Store in production; env var fallback for local dev)
 CHROMA_API_KEY=                 # ChromaDB Cloud API key
 CHROMA_TENANT=                  # Your tenant name
 CHROMA_DATABASE=                # Your database name
 CHROMA_COLLECTION_NAME=         # Collection for documents
+
+# PostgreSQL (use DATABASE_URL or individual PG* vars; also supports VCAP_SERVICES binding on BTP)
+DATABASE_URL=                   # postgres://user:password@host:5432/dbname
+# PGHOST=
+# PGPORT=5432
+# PGDATABASE=
+# PGUSER=
+# PGPASSWORD=
 
 # Model Settings
 TEMPERATURE=0.7                 # LLM temperature (0-1)
@@ -577,26 +614,28 @@ Route definitions in `approuter/xs-app.json`:
 
 > **📋 Roadmap**: The following security enhancements are planned for production deployment. The current implementation uses simple environment variables for ease of development.
 
-#### 1. Credential Management with BTP Credential Store (Planned)
+#### 1. Credential Management with BTP Credential Store
 
-**Future Enhancement**: For production deployments on SAP BTP, credentials should be managed using the **BTP Credential Store service** instead of environment variables.
+The backend integrates with **SAP BTP Credential Store** for secure API key management in production. On startup, the server reads the `VCAP_SERVICES` binding, fetches credentials via the CredStore REST API (with optional RSA-OAEP decryption), and sets them as environment variables before any other service initialises. When no binding is present (local dev), it falls back to `.env` values transparently.
 
-**Benefits of BTP Credential Store:**
-- ✅ Centralized credential management
-- ✅ Automatic credential rotation
+**Credentials managed via CredStore:**
+- `azure-openai-api-key` → `AZURE_OPENAI_API_KEY`
+- `chroma-api-key` → `CHROMA_API_KEY`
+
+**Benefits:**
+- ✅ No secrets in environment variables or code
 - ✅ Encryption at rest and in transit
 - ✅ Audit logging for credential access
-- ✅ No credentials in environment variables or code
-- ✅ Integration with SAP BTP security services
+- ✅ Graceful fallback to `.env` for local development
 
-**Planned Implementation Steps:**
+**Setup on SAP BTP:**
 
 1. **Create Credential Store Service Instance**
    ```bash
    cf create-service credstore free finance-agent-credstore
    ```
 
-2. **Update mta.yaml**
+2. **Bind to backend in mta.yaml**
    ```yaml
    resources:
      - name: finance-agent-credstore
@@ -611,28 +650,8 @@ Route definitions in `approuter/xs-app.json`:
          - name: finance-agent-credstore
    ```
 
-3. **Store Credentials**
-   ```bash
-   # Using CF CLI plugin or BTP Cockpit
-   cf create-service-key finance-agent-credstore cred-key
-
-   # Store Azure OpenAI credentials
-   # Store ChromaDB credentials
-   # Store other sensitive data
-   ```
-
-4. **Access Credentials in Code**
-   ```typescript
-   import { getCredential } from '@sap/xsenv';
-
-   const azureKey = await getCredential('credstore', 'azure-openai-key');
-   const chromaKey = await getCredential('credstore', 'chroma-api-key');
-   ```
-
-**Migration Path:**
-- Development: Continue using `.env` files
-- Staging/Production (Future): Migrate to BTP Credential Store
-- Implementation will include fallback logic for smooth transition
+3. **Store Credentials** (via BTP Cockpit or CF CLI plugin)
+   - Store `azure-openai-api-key` and `chroma-api-key` under your namespace in the credstore instance.
 
 #### 2. Authentication & Authorization (Planned Future Enhancement)
 
@@ -873,6 +892,15 @@ curl http://localhost:3001/api/health
 - Verify ChromaDB credentials
 - Check network connectivity
 - Ensure collection exists
+
+**PostgreSQL Connection Fails**
+- Verify `DATABASE_URL` or individual `PG*` variables are set
+- Ensure the database exists and the user has CREATE TABLE privileges
+- On BTP, confirm the PostgreSQL service is bound in `mta.yaml`
+
+**Credential Store / Missing API Key Errors**
+- Locally: ensure `AZURE_OPENAI_API_KEY` and `CHROMA_API_KEY` are set in `.env`
+- On BTP: confirm `finance-agent-credstore` is bound to the backend module and that `azure-openai-api-key` / `chroma-api-key` entries exist under the correct namespace
 
 **Build Fails**
 ```bash
