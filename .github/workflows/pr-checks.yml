@@ -14,6 +14,8 @@ on:
 jobs:
   test-and-coverage:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -255,6 +257,8 @@ jobs:
 
   test-python-sdk:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
 
     steps:
       - name: Checkout code
