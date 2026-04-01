@@ -4,16 +4,52 @@ const originalVcapServices = process.env.VCAP_SERVICES;
 // Mock crypto module
 jest.mock('crypto', () => ({
   createPrivateKey: jest.fn().mockReturnValue('mock-private-key'),
-  privateDecrypt: jest.fn().mockReturnValue(Buffer.from('decrypted-value')),
   constants: { RSA_PKCS1_OAEP_PADDING: 4 },
 }));
 
+// Mock jose for JWE decryption
+jest.mock('jose', () => ({
+  compactDecrypt: jest.fn().mockResolvedValue({
+    plaintext: Buffer.from(JSON.stringify({ name: 'test', value: 'decrypted-value' })),
+  }),
+}));
+
+// Mock https module
+import https from 'https';
+jest.mock('https');
+
 import { loadCredentials } from '../../services/credstore.service.js';
 
+interface MockRes {
+  statusCode: number;
+  statusMessage: string;
+  on: jest.Mock;
+}
+
+// Helper to create a mock https response
+function mockHttpsResponse(statusCode: number, body: string) {
+  const res: MockRes = {
+    statusCode,
+    statusMessage: statusCode >= 400 ? 'Error' : 'OK',
+    on: jest.fn((event: string, handler: (data?: unknown) => void) => {
+      if (event === 'data') handler(body);
+      if (event === 'end') handler();
+      return res;
+    }),
+  };
+  const req = { on: jest.fn().mockReturnThis(), end: jest.fn() };
+  (https.request as jest.Mock).mockImplementationOnce((_opts: unknown, callback: (res: MockRes) => void) => {
+    callback(res);
+    return req;
+  });
+  return { res, req };
+}
+
 const BINDING_NO_ENCRYPTION = {
-  url: 'https://credstore.example.com',
+  url: 'https://credstore.example.com/api/v1/credentials',
   username: 'testuser',
-  password: 'testpass',
+  certificate: 'test-cert',
+  key: 'test-key',
 };
 
 const BINDING_WITH_ENCRYPTION = {
@@ -31,12 +67,8 @@ function setVcapServices(credentials: object) {
 }
 
 describe('Credstore Service', () => {
-  let mockFetch: jest.Mock;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
     delete process.env.AZURE_OPENAI_API_KEY;
     delete process.env.CHROMA_API_KEY;
   });
@@ -52,7 +84,7 @@ describe('Credstore Service', () => {
 
       await loadCredentials('finance-agent');
 
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(https.request).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('No Credential Store binding found')
       );
@@ -64,7 +96,7 @@ describe('Credstore Service', () => {
 
       await loadCredentials('finance-agent');
 
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(https.request).not.toHaveBeenCalled();
     });
 
     it('should return early when credstore instances array is empty', async () => {
@@ -72,7 +104,7 @@ describe('Credstore Service', () => {
 
       await loadCredentials('finance-agent');
 
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(https.request).not.toHaveBeenCalled();
     });
   });
 
@@ -82,15 +114,8 @@ describe('Credstore Service', () => {
     });
 
     it('should fetch both credentials and set env vars', async () => {
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ value: Buffer.from('azure-key-value').toString('base64') }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ value: Buffer.from('chroma-key-value').toString('base64') }),
-        });
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('azure-key-value').toString('base64') }));
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('chroma-key-value').toString('base64') }));
 
       await loadCredentials('finance-agent');
 
@@ -98,44 +123,47 @@ describe('Credstore Service', () => {
       expect(process.env.CHROMA_API_KEY).toBe('chroma-key-value');
     });
 
-    it('should call fetch with correct URL including namespace and credential name', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ value: Buffer.from('val').toString('base64') }),
-      });
+    it('should call https.request with correct URL including base path and credential name', async () => {
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
 
       await loadCredentials('my-namespace');
 
-      const firstUrl = mockFetch.mock.calls[0][0] as string;
-      expect(firstUrl).toContain('https://credstore.example.com');
-      expect(firstUrl).toContain('/api/v1/credentials/password');
-      expect(firstUrl).toContain('namespace=my-namespace');
-      expect(firstUrl).toContain('name=azure-openai-api-key');
+      const firstCall = (https.request as jest.Mock).mock.calls[0][0];
+      expect(firstCall.hostname).toBe('credstore.example.com');
+      expect(firstCall.path).toContain('/api/v1/credentials/password');
+      expect(firstCall.path).toContain('name=azure-openai-api-key');
+      expect(firstCall.path).not.toContain('namespace=');
     });
 
-    it('should send correct Basic Auth header', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ value: Buffer.from('val').toString('base64') }),
-      });
+    it('should send sapcp-credstore-namespace header', async () => {
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
 
       await loadCredentials('finance-agent');
 
-      const expectedAuth =
-        'Basic ' + Buffer.from('testuser:testpass').toString('base64');
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe(expectedAuth);
+      const firstCall = (https.request as jest.Mock).mock.calls[0][0];
+      expect(firstCall.headers['sapcp-credstore-namespace']).toBe('finance-agent');
     });
 
-    it('should make exactly 2 fetch calls (one per credential)', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ value: Buffer.from('val').toString('base64') }),
-      });
+    it('should pass certificate and key for mTLS', async () => {
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
 
       await loadCredentials('finance-agent');
 
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      const firstCall = (https.request as jest.Mock).mock.calls[0][0];
+      expect(firstCall.cert).toBe('test-cert');
+      expect(firstCall.key).toBe('test-key');
+    });
+
+    it('should make exactly 2 requests (one per credential)', async () => {
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
+
+      await loadCredentials('finance-agent');
+
+      expect(https.request).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -144,18 +172,39 @@ describe('Credstore Service', () => {
       setVcapServices(BINDING_NO_ENCRYPTION);
     });
 
-    it('should not throw when fetch rejects', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'));
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    it('should not throw when request emits an error', async () => {
+      const req = { on: jest.fn(), end: jest.fn() };
+      let errorHandler: ((e: Error) => void) | undefined;
+      req.on.mockImplementation((event: string, handler: (e: Error) => void) => {
+        if (event === 'error') errorHandler = handler;
+        return req;
+      });
+      (https.request as jest.Mock).mockImplementationOnce(() => {
+        setTimeout(() => errorHandler?.(new Error('Network error')), 0);
+        return req;
+      });
+      // Second credential also needs a mock
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
 
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       await expect(loadCredentials('finance-agent')).resolves.not.toThrow();
       consoleSpy.mockRestore();
     });
 
-    it('should log error when fetch fails', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'));
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    it('should log error when request fails', async () => {
+      const req = { on: jest.fn(), end: jest.fn() };
+      let errorHandler: ((e: Error) => void) | undefined;
+      req.on.mockImplementation((event: string, handler: (e: Error) => void) => {
+        if (event === 'error') errorHandler = handler;
+        return req;
+      });
+      (https.request as jest.Mock).mockImplementationOnce(() => {
+        setTimeout(() => errorHandler?.(new Error('Network error')), 0);
+        return req;
+      });
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
 
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       await loadCredentials('finance-agent');
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -166,22 +215,19 @@ describe('Credstore Service', () => {
     });
 
     it('should not throw when server returns non-ok response', async () => {
-      mockFetch.mockResolvedValue({ ok: false, status: 403, statusText: 'Forbidden' });
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      mockHttpsResponse(403, 'Forbidden');
+      mockHttpsResponse(403, 'Forbidden');
 
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       await expect(loadCredentials('finance-agent')).resolves.not.toThrow();
       consoleSpy.mockRestore();
     });
 
     it('should continue loading remaining credentials after one fails', async () => {
-      mockFetch
-        .mockRejectedValueOnce(new Error('First credential failed'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ value: Buffer.from('chroma-key-value').toString('base64') }),
-        });
-      jest.spyOn(console, 'error').mockImplementation();
+      mockHttpsResponse(403, 'Forbidden');
+      mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('chroma-key-value').toString('base64') }));
 
+      jest.spyOn(console, 'error').mockImplementation();
       await loadCredentials('finance-agent');
 
       expect(process.env.AZURE_OPENAI_API_KEY).toBeUndefined();
@@ -194,25 +240,21 @@ describe('Credstore Service', () => {
       setVcapServices(BINDING_WITH_ENCRYPTION);
     });
 
-    it('should decrypt value using RSA when encryption keys are present', async () => {
-      const { privateDecrypt } = require('crypto');
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ value: Buffer.from('encrypted-payload').toString('base64') }),
-      });
+    it('should JWE-decrypt the response when encryption keys are present', async () => {
+      const { compactDecrypt } = require('jose');
+      mockHttpsResponse(200, 'eyJhbGciOiJSU0EtT0FFUCJ9.fake.jwe.token.here');
+      mockHttpsResponse(200, 'eyJhbGciOiJSU0EtT0FFUCJ9.fake.jwe.token.here');
 
       await loadCredentials('finance-agent');
 
-      expect(privateDecrypt).toHaveBeenCalled();
+      expect(compactDecrypt).toHaveBeenCalled();
       expect(process.env.AZURE_OPENAI_API_KEY).toBe('decrypted-value');
     });
 
     it('should call createPrivateKey with the client private key from binding', async () => {
       const { createPrivateKey } = require('crypto');
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ value: Buffer.from('encrypted').toString('base64') }),
-      });
+      mockHttpsResponse(200, 'eyJhbGciOiJSU0EtT0FFUCJ9.fake.jwe.token.here');
+      mockHttpsResponse(200, 'eyJhbGciOiJSU0EtT0FFUCJ9.fake.jwe.token.here');
 
       await loadCredentials('finance-agent');
 
