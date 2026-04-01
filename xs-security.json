@@ -1,0 +1,32 @@
+{
+  "xsappname": "finance-agent",
+  "tenant-mode": "dedicated",
+  "oauth2-configuration": {
+    "token-validity": 43200,
+    "refresh-token-validity": 604800
+  },
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.user",
+      "description": "Access Finance Agent application"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "User",
+      "description": "Finance Agent User",
+      "scope-references": [
+        "$XSAPPNAME.user"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "FinanceAgentUser",
+      "description": "Finance Agent User",
+      "role-template-references": [
+        "$XSAPPNAME.User"
+      ]
+    }
+  ]
+}

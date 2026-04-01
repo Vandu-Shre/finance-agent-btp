@@ -19,9 +19,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
     }
 
     const fileInfo = fileService.processUploadedFile(req.file);
-    // sessionId scopes vector store documents to the uploading session.
-    // Falls back to 'anonymous' until IAS/XSUAA auth is in place.
-    const userId = (req.headers['x-session-id'] as string) || 'anonymous';
+    const userId = req.user?.sub ?? 'anonymous';
 
     try {
       await chatService.indexDocument(req.file.buffer, req.file.originalname, req.file.mimetype, userId);

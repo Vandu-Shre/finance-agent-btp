@@ -38,7 +38,8 @@ modules:
         properties:
           name: backend
           url: ~{url}
-          forwardAuthToken: false
+          forwardAuthToken: true
+      - name: finance-agent-xsuaa
     provides:
       - name: approuter-url
         properties:
@@ -80,6 +81,7 @@ modules:
     requires:
       - name: finance-agent-credstore
       - name: finance-agent-db
+      - name: finance-agent-xsuaa
     provides:
       - name: backend-api
         properties:
@@ -99,3 +101,13 @@ resources:
       service: postgresql-db
       service-plan: trial
       update-service: false
+
+  - name: finance-agent-xsuaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: finance-agent-${org}-${space}
+        tenant-mode: dedicated

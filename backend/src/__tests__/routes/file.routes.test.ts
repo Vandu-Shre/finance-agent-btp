@@ -39,6 +39,15 @@ const app = express();
 app.use(express.json());
 app.use('/api/files', fileRoutes);
 
+// App variant that injects a mock authenticated user
+const appWithUser = express();
+appWithUser.use(express.json());
+appWithUser.use((req: any, _res: any, next: any) => {
+  req.user = { sub: 'user-xyz', email: 'user@test.com', scopes: [] };
+  next();
+});
+appWithUser.use('/api/files', fileRoutes);
+
 describe('File Management API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -71,16 +80,15 @@ describe('File Management API', () => {
       expect(response.body).toHaveProperty('error', 'No file uploaded');
     });
 
-    it('should call saveUpload with the session ID header', async () => {
-      await request(app)
+    it('should call saveUpload with the authenticated user ID', async () => {
+      await request(appWithUser)
         .post('/api/files')
-        .set('x-session-id', 'session-xyz')
         .attach('file', Buffer.from('content'), 'test.txt');
 
       expect(fileService.saveUpload).toHaveBeenCalledWith(
         expect.anything(),
         'stored-test.txt',
-        'session-xyz'
+        'user-xyz'
       );
     });
 

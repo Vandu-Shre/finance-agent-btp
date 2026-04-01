@@ -19,6 +19,17 @@ export class FinanceAgentSDK {
 export * from './types.js';
 export { FileClient } from './file-client.js';
 export { ChatClient } from './chat-client.js';
+export {
+  getAuthorizationUrl,
+  exchangeCodeForToken,
+  refreshAccessToken,
+  xsuaaConfigFromBinding,
+} from './auth.js';
+export type {
+  XsuaaAuthCodeConfig,
+  XsuaaServiceBinding,
+  XsuaaTokenSet,
+} from './auth.js';
 
 // Default export
 export default FinanceAgentSDK;

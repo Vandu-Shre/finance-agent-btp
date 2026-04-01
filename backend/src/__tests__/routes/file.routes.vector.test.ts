@@ -49,10 +49,22 @@ jest.mock('../../services/file.service.js', () => ({
   },
 }));
 
-// Create a test app
+// Create a test app without authentication (req.user is undefined → userId = 'anonymous')
 function createTestApp() {
   const app = express();
   app.use(express.json());
+  app.use('/api/files', fileRoutes);
+  return app;
+}
+
+// Create a test app that injects an authenticated user
+function createTestAppWithUser(sub: string) {
+  const app = express();
+  app.use(express.json());
+  app.use((req: any, _res: any, next: any) => {
+    req.user = { sub, email: `${sub}@test.com`, scopes: [] };
+    next();
+  });
   app.use('/api/files', fileRoutes);
   return app;
 }
@@ -215,10 +227,10 @@ describe('File Routes - Vector Store Integration', () => {
       expect(indexCall[2]).toBe('text/plain'); // mimetype
     });
 
-    it('should use X-Session-ID header as userId when provided', async () => {
-      await request(app)
+    it('should use authenticated user sub as userId when user is present', async () => {
+      const appWithUser = createTestAppWithUser('session-abc-123');
+      await request(appWithUser)
         .post('/api/files')
-        .set('x-session-id', 'session-abc-123')
         .attach('file', Buffer.from('Content'), 'test.txt')
         .expect(200);
 
