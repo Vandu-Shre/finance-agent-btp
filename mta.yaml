@@ -66,7 +66,7 @@ modules:
     properties:
       NODE_ENV: production
       # Azure OpenAI Configuration (non-secret)
-      AZURE_OPENAI_ENDPOINT: https://ra-foundry-exp.openai.azure.com/
+      AZURE_OPENAI_INSTANCE_NAME: ra-foundry-exp
       AZURE_OPENAI_DEPLOYMENT_NAME: gpt-5-nano
       AZURE_OPENAI_API_VERSION: 2025-01-01-preview
       AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME: text-embedding-3-small

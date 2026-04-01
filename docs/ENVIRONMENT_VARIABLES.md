@@ -8,31 +8,31 @@ This document lists all environment variables used by the Finance Agent backend.
 
 ### Azure OpenAI (Required)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI API key | `abc123...` |
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL | `https://your-instance.openai.azure.com` |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | Chat/LLM model deployment name | `gpt-4o`, `gpt-4`, `gpt-35-turbo` |
-| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME` | Embedding model deployment name | `text-embedding-3-small` |
-| `AZURE_OPENAI_API_VERSION` | Azure OpenAI API version | `2024-02-15-preview` |
+| Variable                                 | Description                     | Example                           |
+| ---------------------------------------- | ------------------------------- | --------------------------------- |
+| `AZURE_OPENAI_API_KEY`                   | Azure OpenAI API key            | `abc123...`                       |
+| `AZURE_OPENAI_INSTANCE_NAME`             | Azure OpenAI instance name      | `your-instance`                   |
+| `AZURE_OPENAI_DEPLOYMENT_NAME`           | Chat/LLM model deployment name  | `gpt-4o`, `gpt-4`, `gpt-35-turbo` |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME` | Embedding model deployment name | `text-embedding-3-small`          |
+| `AZURE_OPENAI_API_VERSION`               | Azure OpenAI API version        | `2024-02-15-preview`              |
 
 ### Chroma Cloud (Optional but Recommended)
 
-| Variable | Description | Example | Set in mta.yaml? |
-|----------|-------------|---------|------------------|
-| `CHROMA_HOST` | Chroma Cloud API endpoint | `https://api.trychroma.com` | ✅ Yes |
-| `CHROMA_API_KEY` | Chroma Cloud API key | `chr_abc123...` | ❌ No (set via CF) |
-| `CHROMA_TENANT` | Chroma tenant name | `my-tenant` | ✅ Yes (update default) |
-| `CHROMA_DATABASE` | Chroma database name | `production-db` | ✅ Yes (update default) |
-| `CHROMA_COLLECTION_NAME` | Collection name for documents | `finance-docs` | ✅ Yes |
+| Variable                 | Description                   | Example                     | Set in mta.yaml?        |
+| ------------------------ | ----------------------------- | --------------------------- | ----------------------- |
+| `CHROMA_HOST`            | Chroma Cloud API endpoint     | `https://api.trychroma.com` | ✅ Yes                  |
+| `CHROMA_API_KEY`         | Chroma Cloud API key          | `chr_abc123...`             | ❌ No (set via CF)      |
+| `CHROMA_TENANT`          | Chroma tenant name            | `my-tenant`                 | ✅ Yes (update default) |
+| `CHROMA_DATABASE`        | Chroma database name          | `production-db`             | ✅ Yes (update default) |
+| `CHROMA_COLLECTION_NAME` | Collection name for documents | `finance-docs`              | ✅ Yes                  |
 
 ### Optional
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TEMPERATURE` | LLM temperature (0-1) | `0.7` |
-| `PORT` | Server port | `3001` |
-| `NODE_ENV` | Node environment | `production` |
+| Variable      | Description           | Default      |
+| ------------- | --------------------- | ------------ |
+| `TEMPERATURE` | LLM temperature (0-1) | `0.7`        |
+| `PORT`        | Server port           | `3001`       |
+| `NODE_ENV`    | Node environment      | `production` |
 
 ## What's in mta.yaml?
 
@@ -53,16 +53,13 @@ These must be set manually via Cloud Foundry:
 
 - ❌ `CHROMA_API_KEY` - Sensitive credential
 - ❌ `AZURE_OPENAI_API_KEY` - Sensitive credential
-- ❌ `AZURE_OPENAI_ENDPOINT` - Organization-specific
-- ❌ `AZURE_OPENAI_DEPLOYMENT_NAME` - Organization-specific
-- ❌ `AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME` - Organization-specific
 
 ## How to Set Missing Variables
 
 ```bash
 # Set Azure OpenAI configuration
 cf set-env finance-agent-backend AZURE_OPENAI_API_KEY "your_key"
-cf set-env finance-agent-backend AZURE_OPENAI_ENDPOINT "https://your-instance.openai.azure.com"
+cf set-env finance-agent-backend AZURE_OPENAI_INSTANCE_NAME "your-instance"
 cf set-env finance-agent-backend AZURE_OPENAI_DEPLOYMENT_NAME "gpt-4o"
 cf set-env finance-agent-backend AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME "text-embedding-3-small"
 
@@ -92,7 +89,7 @@ cf env finance-agent-backend | grep -E "(AZURE|CHROMA|NODE_ENV)"
 ```bash
 # backend/.env
 AZURE_OPENAI_API_KEY=your_key
-AZURE_OPENAI_ENDPOINT=https://your-instance.openai.azure.com
+AZURE_OPENAI_INSTANCE_NAME=your-instance
 AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
 

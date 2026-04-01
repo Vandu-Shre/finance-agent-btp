@@ -80,6 +80,7 @@ finance-agent/
 ### Environment Setup
 
 1. **Copy environment template**
+
    ```bash
    cd backend
    cp .env.example .env
@@ -87,10 +88,11 @@ finance-agent/
 
 2. **Configure environment variables**
    Edit `backend/.env`:
+
    ```bash
    # Azure OpenAI Configuration
    AZURE_OPENAI_API_KEY=your_key_here
-   AZURE_OPENAI_ENDPOINT=https://your-instance.openai.azure.com
+   AZURE_OPENAI_INSTANCE_NAME=your-instance
    AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
    AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-small
 
@@ -119,22 +121,27 @@ finance-agent/
 Provides a unified entry point that routes frontend and backend requests, mimicking production environment.
 
 **Step 1: Start Backend**
+
 ```bash
 cd backend
 npm install
 npm run dev
 ```
+
 Backend runs on http://localhost:3001
 
 **Step 2: Start Frontend**
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
 Frontend runs on http://localhost:5173
 
 **Step 3: Start Approuter**
+
 ```bash
 cd approuter-dev
 npm install
@@ -142,8 +149,9 @@ npm start
 ```
 
 **Access the application:** http://localhost:5001
+
 - Frontend: http://localhost:5001
-- Backend API: http://localhost:5001/api/*
+- Backend API: http://localhost:5001/api/\*
 - WebSocket: ws://localhost:5001/api/chat
 
 ## 🏗️ Architecture
@@ -204,6 +212,7 @@ npm start
 ### Component Details
 
 #### Frontend (React + UI5)
+
 - **Framework**: React 18 with TypeScript
 - **Build Tool**: Vite for fast HMR and optimized builds
 - **UI Library**: SAP UI5 Web Components (@ui5/webcomponents-react)
@@ -212,6 +221,7 @@ npm start
 - **State Management**: React hooks
 
 #### Backend (Express + TypeScript)
+
 - **Framework**: Express 5 with TypeScript
 - **WebSocket**: express-ws for real-time bidirectional communication
 - **File Processing**:
@@ -226,6 +236,7 @@ npm start
 - **Testing**: Jest with comprehensive test coverage
 
 #### AI Agent (LangChain)
+
 - **Framework**: LangChain with OpenAI integration
 - **Model**: Azure OpenAI GPT-4 (configurable)
 - **Embeddings**: Azure OpenAI text-embedding models
@@ -234,6 +245,7 @@ npm start
 - **Context Management**: Document-based RAG (Retrieval Augmented Generation)
 
 #### Application Router
+
 - **Production**: SAP @sap/approuter for Cloud Foundry
 - **Development**: Local approuter with nodemon hot reload
 - **Features**:
@@ -261,6 +273,7 @@ npm run test:coverage   # With coverage report
 ### Test Coverage
 
 The project maintains >50% test coverage:
+
 - Unit tests for services and utilities
 - Integration tests for API endpoints
 - Component tests for React components
@@ -272,6 +285,7 @@ Coverage reports are generated in `coverage/` directories.
 ### Cloud Foundry (SAP BTP)
 
 #### Prerequisites
+
 - SAP BTP account with Cloud Foundry enabled
 - cf CLI installed
 - MTA Build Tool (mbt) installed
@@ -279,6 +293,7 @@ Coverage reports are generated in `coverage/` directories.
 #### Quick Deployment
 
 > **💡 Production Notes**:
+>
 > - **BTP Credential Store** is integrated — credentials are fetched securely at runtime via the bound credstore service
 > - **IAS + XSUAA authentication** planned for future deployments
 > - See [Security](#-security) section for details
@@ -339,6 +354,7 @@ No authentication services are configured (simplified for demo purposes).
 GitHub Actions workflow (`.github/workflows/deploy-app.yml`) provides:
 
 **On Push to Main:**
+
 1. **Build & Test**
    - Install dependencies (frontend, backend, sdk)
    - Run tests with coverage
@@ -351,9 +367,11 @@ GitHub Actions workflow (`.github/workflows/deploy-app.yml`) provides:
    - Automatic environment setup
 
 **Manual Trigger:**
+
 - Workflow can be triggered manually via Actions tab
 
 **Secrets Required:**
+
 - `CF_API`: Cloud Foundry API endpoint
 - `CF_USERNAME`: CF username
 - `CF_PASSWORD`: CF password
@@ -377,26 +395,26 @@ npm run build
 ### Usage Example
 
 ```typescript
-import { ChatClient } from '@finance-agent/sdk';
+import { ChatClient } from "@finance-agent/sdk";
 
 // Create client
 const client = new ChatClient({
-  baseUrl: 'http://localhost:3001',
-  reconnectAttempts: 3
+  baseUrl: "http://localhost:3001",
+  reconnectAttempts: 3,
 });
 
 // Connect and send message
 await client.connect();
 
 // Stream responses
-for await (const message of client.sendMessage('What is the revenue?')) {
-  if (message.type === 'content') {
+for await (const message of client.sendMessage("What is the revenue?")) {
+  if (message.type === "content") {
     console.log(message.content);
   }
 }
 
 // Upload file
-await client.uploadFile(fileBuffer, 'report.pdf');
+await client.uploadFile(fileBuffer, "report.pdf");
 
 // List files
 const files = await client.listFiles();
@@ -414,15 +432,18 @@ See `sdk/examples/example.ts` for complete examples.
 The Finance Agent API is fully documented with **OpenAPI 3.0** (formerly Swagger).
 
 **Interactive Documentation (Swagger UI):**
+
 ```
 http://localhost:3001/api-docs
 ```
 
 **OpenAPI Specification Files:**
+
 - YAML: `/openapi.yaml`
 - JSON: `http://localhost:3001/api-docs.json`
 
 **What's Documented:**
+
 - ✅ All REST API endpoints (health, files, chat)
 - ✅ Request/response schemas
 - ✅ WebSocket protocol and message formats
@@ -433,17 +454,20 @@ http://localhost:3001/api-docs
 **Using the API Documentation:**
 
 1. **Swagger UI** - Built-in interactive documentation
+
    ```bash
    npm run dev  # Start backend
    # Open http://localhost:3001/api-docs
    ```
 
 2. **Import to Postman**
+
    ```
    Import → Link → http://localhost:3001/api-docs.json
    ```
 
 3. **Generate Client SDKs**
+
    ```bash
    npx @openapitools/openapi-generator-cli generate \
      -i openapi.yaml \
@@ -461,6 +485,7 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
 ## 🛠️ Technologies & Integrations
 
 ### Frontend Stack
+
 - **React 18** - UI framework with hooks
 - **TypeScript** - Type-safe development
 - **Vite** - Fast build tool and dev server
@@ -470,6 +495,7 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
 - **WebSocket API** - Real-time communication
 
 ### Backend Stack
+
 - **Node.js 18+** - JavaScript runtime
 - **Express 5** - Web framework
 - **TypeScript** - Type-safe server code
@@ -483,6 +509,7 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
 - **BTP Credential Store** - Runtime secret management via VCAP_SERVICES
 
 ### AI & ML Stack
+
 - **LangChain** - AI orchestration framework
   - @langchain/core
   - @langchain/community
@@ -496,6 +523,7 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
   - Document storage and retrieval
 
 ### Development & Testing
+
 - **Jest** - Testing framework
 - **ts-jest** - TypeScript support for Jest
 - **Supertest** - HTTP assertion library
@@ -503,6 +531,7 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
 - **Nodemon** - Hot reload for development
 
 ### Deployment & DevOps
+
 - **Cloud Foundry** - PaaS deployment platform
 - **SAP BTP** - Enterprise cloud platform
 - **MTA** - Multi-Target Application framework
@@ -510,6 +539,7 @@ See [docs/OPENAPI.md](docs/OPENAPI.md) for complete documentation and usage guid
 - **Docker** - Containerization (optional)
 
 ### Routing & Proxy
+
 - **SAP Application Router** - Enterprise routing
   - @sap/approuter
   - WebSocket support
@@ -524,7 +554,7 @@ Key environment variables (see `backend/.env.example`):
 ```bash
 # Azure OpenAI (loaded from BTP Credential Store in production; env var fallback for local dev)
 AZURE_OPENAI_API_KEY=           # Your Azure OpenAI API key
-AZURE_OPENAI_ENDPOINT=          # Azure OpenAI endpoint URL
+AZURE_OPENAI_INSTANCE_NAME=          # Azure OpenAI instance name
 AZURE_OPENAI_DEPLOYMENT_NAME=   # Chat model deployment (e.g., gpt-4o)
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME=  # Embedding model
 
@@ -552,6 +582,7 @@ PORT=3001                       # Backend port
 ### Frontend Configuration
 
 Built-time configuration in `frontend/vite.config.ts`:
+
 - Development proxy to backend
 - Build output optimization
 - React plugin configuration
@@ -559,6 +590,7 @@ Built-time configuration in `frontend/vite.config.ts`:
 ### Application Router Configuration
 
 Route definitions in `approuter/xs-app.json`:
+
 - API routes → backend
 - Static routes → frontend resources
 - WebSocket support enabled
@@ -569,22 +601,26 @@ Route definitions in `approuter/xs-app.json`:
 ### Development Workflow
 
 1. **Create feature branch**
+
    ```bash
    git checkout -b feature/your-feature
    ```
 
 2. **Make changes and test**
+
    ```bash
    npm test
    npm run test:coverage
    ```
 
 3. **Build and verify**
+
    ```bash
    npm run build
    ```
 
 4. **Commit changes**
+
    ```bash
    git add .
    git commit -m "Add: your feature description"
@@ -605,6 +641,7 @@ Route definitions in `approuter/xs-app.json`:
 ## 🔐 Security
 
 ### Current Configuration
+
 - **Authentication**: Disabled (for demo purposes)
 - **CORS**: Enabled for development
 - **File Uploads**: Validated file types (PDF only)
@@ -619,10 +656,12 @@ Route definitions in `approuter/xs-app.json`:
 The backend integrates with **SAP BTP Credential Store** for secure API key management in production. On startup, the server reads the `VCAP_SERVICES` binding, fetches credentials via the CredStore REST API (with optional RSA-OAEP decryption), and sets them as environment variables before any other service initialises. When no binding is present (local dev), it falls back to `.env` values transparently.
 
 **Credentials managed via CredStore:**
+
 - `azure-openai-api-key` → `AZURE_OPENAI_API_KEY`
 - `chroma-api-key` → `CHROMA_API_KEY`
 
 **Benefits:**
+
 - ✅ No secrets in environment variables or code
 - ✅ Encryption at rest and in transit
 - ✅ Audit logging for credential access
@@ -631,11 +670,13 @@ The backend integrates with **SAP BTP Credential Store** for secure API key mana
 **Setup on SAP BTP:**
 
 1. **Create Credential Store Service Instance**
+
    ```bash
    cf create-service credstore free finance-agent-credstore
    ```
 
 2. **Bind to backend in mta.yaml**
+
    ```yaml
    resources:
      - name: finance-agent-credstore
@@ -686,45 +727,50 @@ The current implementation is **unauthenticated for demo purposes**. For product
 
 **Planned OAuth 2.0 Flows:**
 
-**A. Authorization Code Flow (User Authentication)** - *To be implemented*
+**A. Authorization Code Flow (User Authentication)** - _To be implemented_
+
 - Use Case: Browser-based applications, interactive user login
 - SDK Usage: Client applications authenticating end users
 - Planned Implementation:
   ```typescript
   // SDK Configuration
   const client = new ChatClient({
-    baseUrl: 'https://your-app.cfapps.sap.hana.ondemand.com',
+    baseUrl: "https://your-app.cfapps.sap.hana.ondemand.com",
     auth: {
-      type: 'oauth2',
-      flow: 'authorization_code',
-      clientId: 'your-client-id',
-      redirectUri: 'https://your-app/callback',
-      tokenEndpoint: 'https://your-tenant.authentication.sap.hana.ondemand.com/oauth/token'
-    }
+      type: "oauth2",
+      flow: "authorization_code",
+      clientId: "your-client-id",
+      redirectUri: "https://your-app/callback",
+      tokenEndpoint:
+        "https://your-tenant.authentication.sap.hana.ondemand.com/oauth/token",
+    },
   });
   ```
 
-**B. Client Credentials Flow (Service-to-Service)** - *To be implemented*
+**B. Client Credentials Flow (Service-to-Service)** - _To be implemented_
+
 - Use Case: Backend services, scheduled jobs, API integrations
 - SDK Usage: Server-side applications, microservices communication
 - Planned Implementation:
   ```typescript
   // SDK Configuration
   const client = new ChatClient({
-    baseUrl: 'https://your-app.cfapps.sap.hana.ondemand.com',
+    baseUrl: "https://your-app.cfapps.sap.hana.ondemand.com",
     auth: {
-      type: 'oauth2',
-      flow: 'client_credentials',
-      clientId: 'your-client-id',
+      type: "oauth2",
+      flow: "client_credentials",
+      clientId: "your-client-id",
       clientSecret: process.env.CLIENT_SECRET, // From Credential Store
-      tokenEndpoint: 'https://your-tenant.authentication.sap.hana.ondemand.com/oauth/token'
-    }
+      tokenEndpoint:
+        "https://your-tenant.authentication.sap.hana.ondemand.com/oauth/token",
+    },
   });
   ```
 
 **Planned Implementation Steps for Authentication:**
 
-1. **Bind IAS and XSUAA Services** *(Future)*
+1. **Bind IAS and XSUAA Services** _(Future)_
+
    ```yaml
    # mta.yaml
    resources:
@@ -752,7 +798,8 @@ The current implementation is **unauthenticated for demo purposes**. For product
          - name: finance-agent-xsuaa
    ```
 
-2. **Configure xs-security.json** *(Future)*
+2. **Configure xs-security.json** _(Future)_
+
    ```json
    {
      "xsappname": "finance-agent",
@@ -783,14 +830,13 @@ The current implementation is **unauthenticated for demo purposes**. For product
          "client_credentials",
          "refresh_token"
        ],
-       "redirect-uris": [
-         "https://*.cfapps.*.hana.ondemand.com/**"
-       ]
+       "redirect-uris": ["https://*.cfapps.*.hana.ondemand.com/**"]
      }
    }
    ```
 
-3. **Update Approuter Configuration** *(Future)*
+3. **Update Approuter Configuration** _(Future)_
+
    ```json
    {
      "authenticationMethod": "route",
@@ -806,12 +852,13 @@ The current implementation is **unauthenticated for demo purposes**. For product
    }
    ```
 
-4. **Enhance SDK with Authentication Support** *(Future)*
+4. **Enhance SDK with Authentication Support** _(Future)_
+
    ```typescript
    // Planned SDK enhancement
    interface AuthConfig {
-     type: 'oauth2' | 'bearer' | 'none';
-     flow?: 'authorization_code' | 'client_credentials';
+     type: "oauth2" | "bearer" | "none";
+     flow?: "authorization_code" | "client_credentials";
      clientId?: string;
      clientSecret?: string;
      tokenEndpoint?: string;
@@ -825,6 +872,7 @@ The current implementation is **unauthenticated for demo purposes**. For product
    ```
 
 **Value Proposition for Planned Authentication:**
+
 - 🔐 **Enterprise-grade security** - Industry-standard OAuth 2.0
 - 👥 **User management** - Centralized identity management with IAS
 - 🎫 **Fine-grained authorization** - Role-based access control with XSUAA
@@ -849,6 +897,7 @@ The current implementation is **unauthenticated for demo purposes**. For product
 ## 📊 Monitoring & Logs
 
 ### Local Development
+
 ```bash
 # Backend logs
 cd backend && npm run dev
@@ -858,6 +907,7 @@ cd backend && npm run dev
 ```
 
 ### Cloud Foundry
+
 ```bash
 # View logs
 cf logs finance-agent-backend --recent
@@ -875,6 +925,7 @@ cf app finance-agent-backend
 ### Common Issues
 
 **WebSocket Connection Fails**
+
 ```bash
 # Check backend is running
 curl http://localhost:3001/api/health
@@ -884,25 +935,30 @@ curl http://localhost:3001/api/health
 ```
 
 **File Upload Fails**
+
 - Ensure file is PDF
 - Check file size (<10MB)
 - Verify backend uploads directory exists
 
 **Vector Store Errors**
+
 - Verify ChromaDB credentials
 - Check network connectivity
 - Ensure collection exists
 
 **PostgreSQL Connection Fails**
+
 - Verify `DATABASE_URL` or individual `PG*` variables are set
 - Ensure the database exists and the user has CREATE TABLE privileges
 - On BTP, confirm the PostgreSQL service is bound in `mta.yaml`
 
 **Credential Store / Missing API Key Errors**
+
 - Locally: ensure `AZURE_OPENAI_API_KEY` and `CHROMA_API_KEY` are set in `.env`
 - On BTP: confirm `finance-agent-credstore` is bound to the backend module and that `azure-openai-api-key` / `chroma-api-key` entries exist under the correct namespace
 
 **Build Fails**
+
 ```bash
 # Clean and rebuild
 rm -rf node_modules package-lock.json
@@ -925,6 +981,7 @@ This project is proprietary and confidential.
 ## 📞 Support
 
 For issues and questions:
+
 1. Review troubleshooting section above
 2. Check logs for error details
 3. Review environment variable configuration

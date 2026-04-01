@@ -1,6 +1,6 @@
 // Mock environment variables before importing anything
 process.env.AZURE_OPENAI_API_KEY = 'test-api-key';
-process.env.AZURE_OPENAI_ENDPOINT = 'https://test-instance.openai.azure.com';
+process.env.AZURE_OPENAI_INSTANCE_NAME = 'test-instance';
 process.env.AZURE_OPENAI_DEPLOYMENT_NAME = 'test-deployment';
 process.env.AZURE_OPENAI_API_VERSION = '2024-02-15-preview';
 process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME = 'test-embedding-deployment';
