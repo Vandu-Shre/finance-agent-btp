@@ -1,9 +1,13 @@
-import { createPrivateKey, privateDecrypt, constants } from 'crypto';
+import { createPrivateKey } from 'crypto';
+import { request as httpsRequest } from 'https';
+import { URL } from 'url';
+import { compactDecrypt } from 'jose';
 
 interface CredstoreBinding {
   url: string;
   username: string;
-  password: string;
+  certificate?: string;
+  key?: string;
   encryption?: {
     client_private_key: string;
     server_public_key: string;
@@ -32,36 +36,54 @@ function getBinding(): CredstoreBinding | null {
   return instances[0].credentials as CredstoreBinding;
 }
 
-function decryptValue(encryptedBase64: string, privateKeyBase64: string): string {
+async function decryptJwe(jweToken: string, privateKeyBase64: string): Promise<CredstoreCredential> {
   const keyBuffer = Buffer.from(privateKeyBase64, 'base64');
   const privateKey = createPrivateKey({ key: keyBuffer, format: 'der', type: 'pkcs8' });
-
-  const decrypted = privateDecrypt(
-    { key: privateKey, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
-    Buffer.from(encryptedBase64, 'base64')
-  );
-
-  return decrypted.toString('utf-8');
+  const { plaintext } = await compactDecrypt(jweToken, privateKey);
+  return JSON.parse(Buffer.from(plaintext).toString('utf-8')) as CredstoreCredential;
 }
 
+// binding.url already includes the base path (e.g. /api/v1/credentials),
+// so we only append the credential type as a suffix.
 async function fetchCredential(binding: CredstoreBinding, namespace: string, name: string): Promise<string> {
-  const url = `${binding.url}/api/v1/credentials/password?namespace=${encodeURIComponent(namespace)}&name=${encodeURIComponent(name)}`;
-  const auth = Buffer.from(`${binding.username}:${binding.password}`).toString('base64');
+  const url = `${binding.url}/password?name=${encodeURIComponent(name)}`;
+  const parsed = new URL(url);
 
-  const response = await fetch(url, {
-    headers: { 'Authorization': `Basic ${auth}` },
+  const body = await new Promise<string>((resolve, reject) => {
+    const req = httpsRequest(
+      {
+        hostname: parsed.hostname,
+        port: Number(parsed.port) || 443,
+        path: `${parsed.pathname}${parsed.search}`,
+        method: 'GET',
+        headers: { 'sapcp-credstore-namespace': namespace },
+        cert: binding.certificate,
+        key: binding.key,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (!res.statusCode || res.statusCode >= 400) {
+            reject(new Error(`Credential Store fetch failed for '${name}': ${res.statusCode} ${res.statusMessage}`));
+          } else {
+            resolve(data);
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    req.end();
   });
 
-  if (!response.ok) {
-    throw new Error(`Credential Store fetch failed for '${name}': ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json() as CredstoreCredential;
-
+  // When payload encryption is enabled the entire response body is a JWE compact serialization.
+  // After JWE decryption the value is plain text. Without encryption it is base64-encoded.
   if (binding.encryption?.client_private_key) {
-    return decryptValue(data.value, binding.encryption.client_private_key);
+    const data = await decryptJwe(body, binding.encryption.client_private_key);
+    return data.value;
   }
 
+  const data = JSON.parse(body) as CredstoreCredential;
   return Buffer.from(data.value, 'base64').toString('utf-8');
 }
 
