@@ -37,7 +37,7 @@ export class FinanceAgent {
     const llm = new AzureChatOpenAI({
       azureOpenAIApiKey: agentConfig.azure.apiKey,
       azureOpenAIApiVersion: agentConfig.azure.apiVersion,
-      azureOpenAIApiInstanceName: this.extractInstanceName(agentConfig.azure.endpoint),
+      azureOpenAIApiInstanceName: agentConfig.azure.instanceName,
       azureOpenAIApiDeploymentName: agentConfig.azure.deploymentName,
       temperature: agentConfig.azure.temperature,
     });
@@ -50,15 +50,6 @@ export class FinanceAgent {
 
     // Create the chain
     this.chain = prompt.pipe(llm).pipe(new StringOutputParser());
-  }
-
-  /**
-   * Extract instance name from Azure OpenAI endpoint
-   * Example: https://your-instance.openai.azure.com/ -> your-instance
-   */
-  private extractInstanceName(endpoint: string): string {
-    const url = new URL(endpoint);
-    return url.hostname.split('.')[0] || '';
   }
 
   async chat(input: string, context: string = ''): Promise<string> {

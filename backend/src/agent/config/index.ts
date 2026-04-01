@@ -8,7 +8,7 @@ export const agentConfig = {
   azure: {
     apiKey: '',
     apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
-    endpoint: process.env.AZURE_OPENAI_ENDPOINT || '',
+    instanceName: process.env.AZURE_OPENAI_INSTANCE_NAME || '',
 
     // Chat/LLM Model - for generating responses and conversations
     deploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || '',
@@ -28,8 +28,8 @@ export const agentConfig = {
 };
 
 // Validate required configuration (non-secret fields)
-if (!agentConfig.azure.endpoint) {
-  throw new Error('AZURE_OPENAI_ENDPOINT is required. Please set it in .env file.');
+if (!agentConfig.azure.instanceName) {
+  throw new Error('AZURE_OPENAI_INSTANCE_NAME is required. Please set it in .env file.');
 }
 if (!agentConfig.azure.deploymentName) {
   throw new Error('AZURE_OPENAI_DEPLOYMENT_NAME is required. Please set it in .env file (this is your chat/LLM model).');
@@ -62,7 +62,7 @@ export async function initConfig(): Promise<void> {
   console.log('📝 Configuration loaded:');
   console.log(`  - Chat Model: ${agentConfig.azure.deploymentName}`);
   console.log(`  - Embedding Model: ${agentConfig.azure.embeddingDeploymentName}`);
-  console.log(`  - Endpoint: ${agentConfig.azure.endpoint}`);
+  console.log(`  - Azure OpenAI Instance Name: ${agentConfig.azure.instanceName}`);
   console.log(`  - Chroma Tenant: ${agentConfig.chroma.tenant}`);
   console.log(`  - Chroma Database: ${agentConfig.chroma.database}`);
   console.log(`  - Chroma Collection: ${agentConfig.chroma.collectionName}`);

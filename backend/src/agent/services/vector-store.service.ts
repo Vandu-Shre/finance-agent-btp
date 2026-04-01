@@ -12,18 +12,11 @@ import { tmpdir } from 'os';
 let vectorStore: Chroma | null = null;
 const CHROMA_CONNECTION_TIMEOUT_MS = 10_000;
 
-/**
- * Extract instance name from Azure OpenAI endpoint
- */
-function extractInstanceName(endpoint: string): string {
-  const url = new URL(endpoint);
-  return url.hostname.split('.')[0] || '';
-}
 
 function createEmbeddings(): AzureOpenAIEmbeddings {
   return new AzureOpenAIEmbeddings({
     azureOpenAIApiKey: agentConfig.azure.apiKey,
-    azureOpenAIApiInstanceName: extractInstanceName(agentConfig.azure.endpoint),
+    azureOpenAIApiInstanceName: agentConfig.azure.instanceName,
     azureOpenAIApiDeploymentName: agentConfig.azure.embeddingDeploymentName,
     azureOpenAIApiVersion: agentConfig.azure.apiVersion,
   });
@@ -87,7 +80,7 @@ async function extractText(buffer: Buffer, mimetype: string, filename: string): 
     return buffer.toString('utf-8');
   }
   if (mimetype === 'application/json') {
-    return JSON.stringify(JSON.parse(buffer.toString('utf-8')), null, 2);
+    return JSON.stringify(JSON.parse(buffer.toString('utf-8')));
   }
   if (mimetype === 'application/pdf') {
     const tempFilePath = join(tmpdir(), `temp-${Date.now()}-${filename}`);
@@ -159,24 +152,6 @@ export async function deleteDocumentByFilename(filename: string): Promise<void> 
     console.log(`✅ Deleted chunks for document: ${filename}`);
   } catch (error) {
     console.error(`Failed to delete chunks for ${filename}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Get all unique document sources in the vector store
- */
-export async function getAllDocumentSources(): Promise<string[]> {
-  if (!vectorStore) {
-    throw new Error('Vector store not initialized. Call initializeVectorStore() first.');
-  }
-
-  try {
-    // This is a simplified implementation
-    // In production, you might want to maintain a separate index of document metadata
-    return [];
-  } catch (error) {
-    console.error('Failed to get document sources:', error);
     throw error;
   }
 }

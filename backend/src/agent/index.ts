@@ -6,7 +6,6 @@ export {
   initializeVectorStore,
   indexDocumentFromBuffer,
   searchDocuments,
-  deleteDocumentByFilename,
-  getAllDocumentSources
+  deleteDocumentByFilename
 } from './services/vector-store.service.js';
 

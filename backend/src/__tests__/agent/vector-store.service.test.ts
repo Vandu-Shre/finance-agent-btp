@@ -18,7 +18,7 @@ jest.mock('../../agent/config/index.js', () => ({
     azure: {
       apiKey: 'test-api-key',
       apiVersion: '2024-02-15-preview',
-      endpoint: 'https://test-instance.openai.azure.com',
+      instanceName: 'test-instance',
       deploymentName: 'test-deployment',
       embeddingDeploymentName: 'test-embedding-deployment',
       temperature: 0.7,
