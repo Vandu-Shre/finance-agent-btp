@@ -76,7 +76,7 @@ jobs:
           FUNCTIONS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).functions)")
           BRANCHES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).branches)")
 
-          THRESHOLD=50
+          THRESHOLD=85
           if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
             echo "❌ Frontend line coverage ($LINES%) is below threshold ($THRESHOLD%)"
             exit 1
@@ -117,7 +117,7 @@ jobs:
           FUNCTIONS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).functions)")
           BRANCHES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).branches)")
 
-          THRESHOLD=50
+          THRESHOLD=85
           if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
             echo "❌ Backend line coverage ($LINES%) is below threshold ($THRESHOLD%)"
             exit 1
@@ -158,7 +158,7 @@ jobs:
           FUNCTIONS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).functions)")
           BRANCHES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).branches)")
 
-          THRESHOLD=50
+          THRESHOLD=85
           if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
             echo "❌ SDK line coverage ($LINES%) is below threshold ($THRESHOLD%)"
             exit 1
@@ -190,7 +190,7 @@ jobs:
               data = json.load(f)
           print(data['totals']['percent_covered'])
           ")
-          THRESHOLD=50
+          THRESHOLD=85
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "❌ Python SDK coverage ($COVERAGE%) is below threshold ($THRESHOLD%)"
             exit 1
@@ -249,7 +249,7 @@ jobs:
               return `Lines: ${pct}% (${cov.covered_lines}/${cov.num_statements} statements)`;
             };
 
-            const threshold = 50;
+            const threshold = 85;
             const jsCheck = (cov) => cov ? (cov.lines.pct >= threshold ? '✅' : '❌') : 'N/A';
             const pyCheck = (cov) => cov ? (cov.percent_covered >= threshold ? '✅' : '❌') : 'N/A';
 
