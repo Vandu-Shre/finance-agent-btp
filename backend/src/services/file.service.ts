@@ -48,7 +48,7 @@ export class FileService {
    */
   async getAllFiles(): Promise<FileInfo[]> {
     const rows = await prisma.file.findMany({ orderBy: { uploadDate: 'desc' } });
-    return rows.map(r => {
+    return rows.map((r: typeof rows[number]) => {
       const parts = r.fileName.split('.');
       const ext = parts.length > 1 ? parts.pop()?.toUpperCase() || 'Unknown' : 'Unknown';
       return {
