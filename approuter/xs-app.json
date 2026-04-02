@@ -1,38 +1,38 @@
 {
-  "authenticationMethod": "none",
+  "authenticationMethod": "route",
   "routes": [
     {
       "source": "^/api/chat$",
       "target": "/api/chat",
       "destination": "backend",
-      "authenticationType": "none",
+      "authenticationType": "xsuaa",
       "csrfProtection": false
     },
     {
       "source": "^/api/files$",
       "target": "/api/files",
       "destination": "backend",
-      "authenticationType": "none",
-      "csrfProtection": false
+      "authenticationType": "xsuaa",
+      "csrfProtection": true
     },
     {
       "source": "^/api/files/(.*)$",
       "target": "/api/files/$1",
       "destination": "backend",
-      "authenticationType": "none",
-      "csrfProtection": false
+      "authenticationType": "xsuaa",
+      "csrfProtection": true
     },
     {
       "source": "^/api/(.*)$",
       "target": "/api/$1",
       "destination": "backend",
-      "authenticationType": "none",
+      "authenticationType": "xsuaa",
       "csrfProtection": false
     },
     {
       "source": "^(.*)$",
       "localDir": "resources",
-      "authenticationType": "none",
+      "authenticationType": "xsuaa",
       "csrfProtection": false,
       "cacheControl": "public, max-age=31536000, immutable"
     }

@@ -62,7 +62,10 @@ export interface FinanceAgentConfig {
   baseUrl: string;
 
   /**
-   * Optional authentication token
+   * XSUAA JWT Bearer token for authenticated requests.
+   * Obtain via client credentials flow or user token exchange against your
+   * XSUAA service instance token URL.
+   * When provided, sent as `Authorization: Bearer <token>` on all requests.
    */
   authToken?: string;
 

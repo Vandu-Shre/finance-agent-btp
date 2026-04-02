@@ -2,19 +2,19 @@
 const API_BASE_URL = '/api';
 
 // WebSocket URL - automatically detect protocol and use current host
-const getWebSocketUrl = (): string => {
+export const getWebSocketUrl = (
+  loc: Pick<Location, 'hostname' | 'protocol' | 'host'> = window.location
+): string => {
   // In production (Cloud Foundry), use current host and wss protocol
   // In development, use localhost
-  if (window.location.hostname === 'localhost') {
+  if (loc.hostname === 'localhost') {
     return 'ws://localhost:5001/api';
   }
 
   // Production: use wss:// with current hostname
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}/api`;
+  const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${loc.host}/api`;
 };
-
-const WS_BASE_URL = getWebSocketUrl();
 
 export type FileInfo = {
   fileName: string;
@@ -109,10 +109,9 @@ export const chatApi = {
     onNewSession?: (sessionId: string) => void
   ): WebSocket {
     // Use approuter URL for WebSocket - changed from /chat/stream to /chat
-    const wsUrl = `${WS_BASE_URL}/chat`;
+    const wsUrl = `${getWebSocketUrl()}/chat`;
     console.log('Creating WebSocket connection to:', wsUrl);
     console.log('Window location:', window.location.href);
-    console.log('Detected WS_BASE_URL:', WS_BASE_URL);
 
     const ws = new WebSocket(wsUrl);
 

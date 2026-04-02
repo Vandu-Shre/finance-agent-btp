@@ -2,8 +2,10 @@ import { ChatService } from '../../services/chat.service.js';
 import { FinanceAgent, initializeVectorStore, indexDocumentFromBuffer, searchDocuments } from '../../agent/index.js';
 
 jest.mock('../../services/db.service.js', () => ({
-  persist: jest.fn(),
-  query: jest.fn().mockResolvedValue([]),
+  prisma: {
+    session: { create: jest.fn().mockResolvedValue({}) },
+    message: { create: jest.fn().mockResolvedValue({}) },
+  },
 }));
 
 jest.mock('../../services/file.service.js', () => ({

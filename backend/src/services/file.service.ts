@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { query, persist } from './db.service.js';
+import { prisma } from './db.service.js';
 
 export interface FileInfo {
   fileName: string;
@@ -31,33 +31,32 @@ export class FileService {
    * Persist file metadata to the database (fire-and-forget).
    */
   saveUpload(file: Express.Multer.File, storedName: string, sessionId: string): void {
-    persist(
-      `INSERT INTO files (id, session_id, file_name, stored_name, mime_type, size_bytes)
-       VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (stored_name) DO NOTHING`,
-      [randomUUID(), sessionId, file.originalname, storedName, file.mimetype, file.size]
-    );
+    prisma.file.create({
+      data: {
+        id: randomUUID(),
+        sessionId,
+        fileName: file.originalname,
+        storedName,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+      },
+    }).catch((err: Error) => console.error('DB persist file failed:', err.message));
   }
 
   /**
    * Return all file records from the database.
    */
   async getAllFiles(): Promise<FileInfo[]> {
-    const rows = await query<{
-      file_name: string;
-      stored_name: string;
-      size_bytes: number;
-      upload_date: Date;
-    }>('SELECT file_name, stored_name, size_bytes, upload_date FROM files ORDER BY upload_date DESC');
-
-    return rows.map(r => {
-      const parts = r.file_name.split('.');
+    const rows = await prisma.file.findMany({ orderBy: { uploadDate: 'desc' } });
+    return rows.map((r: typeof rows[number]) => {
+      const parts = r.fileName.split('.');
       const ext = parts.length > 1 ? parts.pop()?.toUpperCase() || 'Unknown' : 'Unknown';
       return {
-        fileName: r.file_name,
-        storedName: r.stored_name,
+        fileName: r.fileName,
+        storedName: r.storedName,
         type: ext,
-        size: this.formatFileSize(r.size_bytes),
-        uploadDate: new Date(r.upload_date).toISOString().split('T')[0] || '',
+        size: this.formatFileSize(r.sizeBytes ?? 0),
+        uploadDate: r.uploadDate.toISOString().split('T')[0] || '',
       };
     });
   }
@@ -66,13 +65,10 @@ export class FileService {
    * Delete a file record from the database by its stored name.
    */
   async deleteFile(storedName: string): Promise<{ success: boolean; error?: string; originalName?: string }> {
-    const rows = await query<{ file_name: string }>(
-      'SELECT file_name FROM files WHERE stored_name = $1',
-      [storedName]
-    );
-    if (rows.length === 0) return { success: false, error: 'File not found' };
-    await query('DELETE FROM files WHERE stored_name = $1', [storedName]);
-    return { success: true, originalName: rows[0]!.file_name };
+    const file = await prisma.file.findFirst({ where: { storedName } });
+    if (!file) return { success: false, error: 'File not found' };
+    await prisma.file.delete({ where: { storedName } });
+    return { success: true, originalName: file.fileName };
   }
 
   private formatFileSize(bytes: number): string {

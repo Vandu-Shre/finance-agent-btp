@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request } from 'express';
 import expressWs from 'express-ws';
 import WebSocket from 'ws';
 import chatService from '../services/chat.service.js';
@@ -79,10 +79,15 @@ function handleAction(ws: any, payload: any): void {
 }
 
 // WebSocket endpoint - handles all chat communication
-wsRouter.ws('/', (ws: any) => {
+wsRouter.ws('/', (ws: any, req: Request) => {
   const clientId = addWSClient(ws);
-  console.log(`WebSocket client connected: ${clientId}, total: ${wsClients.length}`);
-  send(ws, 'connected', { status: 'connected', session: chatService.getCurrentSession() });
+  const user = req.user;
+  console.log(`WebSocket client connected: ${clientId}, user: ${user?.sub ?? 'unknown'}, total: ${wsClients.length}`);
+  send(ws, 'connected', {
+    status: 'connected',
+    session: chatService.getCurrentSession(),
+    user: user ? { sub: user.sub, email: user.email, name: user.given_name } : undefined,
+  });
 
   ws.on('message', (data: string) => {
     try {

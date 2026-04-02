@@ -76,4 +76,41 @@ describe('Layout', () => {
     const filesItem = screen.getByText('Files').closest('[data-key="files"]');
     expect(filesItem).toHaveAttribute('data-selected', 'true');
   });
+
+  it('should call onNavigate with "chat" when Chat nav item is clicked', async () => {
+    const handleNavigate = jest.fn();
+    const user = userEvent.setup();
+
+    render(<Layout {...defaultProps} onNavigate={handleNavigate} />);
+
+    const chatItem = screen.getByText('Chat');
+    await user.click(chatItem);
+
+    expect(handleNavigate).toHaveBeenCalledWith('chat');
+  });
+
+  it('should call onNavigate with "files" when Files nav item is clicked', async () => {
+    const handleNavigate = jest.fn();
+    const user = userEvent.setup();
+
+    render(<Layout {...defaultProps} onNavigate={handleNavigate} />);
+
+    const filesItem = screen.getByText('Files');
+    await user.click(filesItem);
+
+    expect(handleNavigate).toHaveBeenCalledWith('files');
+  });
+
+  it('should log profile click when avatar is clicked', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+    const user = userEvent.setup();
+
+    render(<Layout {...defaultProps} />);
+
+    const avatar = screen.getByText('JM');
+    await user.click(avatar);
+
+    expect(consoleSpy).toHaveBeenCalledWith('Profile clicked');
+    consoleSpy.mockRestore();
+  });
 });

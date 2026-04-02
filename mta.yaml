@@ -15,11 +15,6 @@ build-parameters:
         - npm run build --prefix frontend
         - mkdir -p approuter/resources
         - bash -c "cp -r frontend/dist/* approuter/resources/"
-  after-all:
-    - builder: custom
-      commands:
-        - npm install --prefix backend
-        - npm run build --prefix backend
 
 modules:
   # Application Router (Reverse Proxy + Static Frontend)
@@ -38,7 +33,8 @@ modules:
         properties:
           name: backend
           url: ~{url}
-          forwardAuthToken: false
+          forwardAuthToken: true
+      - name: finance-agent-xsuaa
     provides:
       - name: approuter-url
         properties:
@@ -52,8 +48,23 @@ modules:
       disk-quota: 1G
       memory: 512M
       instances: 1
+    hooks:
+      - name: db-migrate
+        type: task
+        phases:
+          - before-start
+        parameters:
+          name: db-migrate
+          command: npm run db:migrate:prod
+          memory: 256M
+          disk-quota: 512M
     build-parameters:
-      builder: npm
+      builder: custom
+      commands:
+        - npm install
+        - npm run db:generate:prod
+        - npm run build
+      build-result: .
       ignore:
         - uploads/
         - coverage/
@@ -80,6 +91,7 @@ modules:
     requires:
       - name: finance-agent-credstore
       - name: finance-agent-db
+      - name: finance-agent-xsuaa
     provides:
       - name: backend-api
         properties:
@@ -99,3 +111,13 @@ resources:
       service: postgresql-db
       service-plan: trial
       update-service: false
+
+  - name: finance-agent-xsuaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: finance-agent-${org}-${space}
+        tenant-mode: dedicated

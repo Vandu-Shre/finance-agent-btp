@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Session {
+  id        String    @id
+  createdAt DateTime  @default(now()) @map("created_at")
+  messages  Message[]
+
+  @@map("sessions")
+}
+
+model Message {
+  id        String   @id
+  sessionId String   @map("session_id")
+  text      String
+  sender    String
+  timestamp DateTime
+  metadata  String?
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model File {
+  id         String   @id
+  sessionId  String   @map("session_id")
+  fileName   String   @map("file_name")
+  storedName String   @unique @map("stored_name")
+  mimeType   String?  @map("mime_type")
+  sizeBytes  Int?     @map("size_bytes")
+  uploadDate DateTime @default(now()) @map("upload_date")
+
+  @@map("files")
+}
