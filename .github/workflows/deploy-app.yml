@@ -13,9 +13,14 @@ on:
       - ".github/workflows/deploy-app.yml"
   workflow_dispatch:
 
+permissions:
+  actions: write  # required to update APP_VERSION variable after deployment
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
 
     steps:
       - name: Checkout code
@@ -103,6 +108,14 @@ jobs:
           tar -xzf /tmp/mbt.tar.gz -C $HOME/bin
           echo "$HOME/bin" >> $GITHUB_PATH
 
+      - name: Set app version
+        id: set-version
+        run: |
+          VERSION="${{ vars.APP_VERSION }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          sed -i "s/^version: .*/version: $VERSION/" mta.yaml
+          echo "Building MTA with version $VERSION"
+
       - name: Build MTA archive
         run: mbt build -p=cf
 
@@ -149,3 +162,14 @@ jobs:
         run: |
           MTAR_FILE=$(ls mta_archives/*.mtar | head -n 1)
           cf deploy "$MTAR_FILE" -f
+
+      - name: Bump APP_VERSION variable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT="${{ needs.build-and-test.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          gh api --method PATCH /repos/${{ github.repository }}/actions/variables/APP_VERSION \
+            -f value="$NEW_VERSION"
+          echo "Version bumped: $CURRENT → $NEW_VERSION"
