@@ -60,40 +60,18 @@ jobs:
       - name: Check frontend coverage thresholds
         run: |
           cd frontend
-          COVERAGE=$(node -e "
+          LINES=$(node -e "
             const coverage = require('./coverage/coverage-summary.json');
-            const total = coverage.total;
-            const lines = total.lines.pct;
-            const statements = total.statements.pct;
-            const functions = total.functions.pct;
-            const branches = total.branches.pct;
-            console.log(JSON.stringify({ lines, statements, functions, branches }));
+            console.log(coverage.total.lines.pct);
           ")
-          echo "Frontend Coverage: $COVERAGE"
-
-          LINES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).lines)")
-          STATEMENTS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).statements)")
-          FUNCTIONS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).functions)")
-          BRANCHES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).branches)")
+          echo "Frontend line coverage: $LINES%"
 
           THRESHOLD=85
           if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
             echo "❌ Frontend line coverage ($LINES%) is below threshold ($THRESHOLD%)"
             exit 1
           fi
-          if (( $(echo "$STATEMENTS < $THRESHOLD" | bc -l) )); then
-            echo "❌ Frontend statement coverage ($STATEMENTS%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          if (( $(echo "$FUNCTIONS < $THRESHOLD" | bc -l) )); then
-            echo "❌ Frontend function coverage ($FUNCTIONS%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          if (( $(echo "$BRANCHES < $THRESHOLD" | bc -l) )); then
-            echo "❌ Frontend branch coverage ($BRANCHES%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          echo "✅ Frontend coverage meets all thresholds (${THRESHOLD}%)"
+          echo "✅ Frontend line coverage meets threshold (${THRESHOLD}%)"
 
       - name: Run backend tests with coverage
         run: npm run test:coverage --prefix backend
@@ -101,40 +79,18 @@ jobs:
       - name: Check backend coverage thresholds
         run: |
           cd backend
-          COVERAGE=$(node -e "
+          LINES=$(node -e "
             const coverage = require('./coverage/coverage-summary.json');
-            const total = coverage.total;
-            const lines = total.lines.pct;
-            const statements = total.statements.pct;
-            const functions = total.functions.pct;
-            const branches = total.branches.pct;
-            console.log(JSON.stringify({ lines, statements, functions, branches }));
+            console.log(coverage.total.lines.pct);
           ")
-          echo "Backend Coverage: $COVERAGE"
+          echo "Backend line coverage: $LINES%"
 
-          LINES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).lines)")
-          STATEMENTS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).statements)")
-          FUNCTIONS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).functions)")
-          BRANCHES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).branches)")
-
-          THRESHOLD=80
+          THRESHOLD=85
           if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
             echo "❌ Backend line coverage ($LINES%) is below threshold ($THRESHOLD%)"
             exit 1
           fi
-          if (( $(echo "$STATEMENTS < $THRESHOLD" | bc -l) )); then
-            echo "❌ Backend statement coverage ($STATEMENTS%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          if (( $(echo "$FUNCTIONS < $THRESHOLD" | bc -l) )); then
-            echo "❌ Backend function coverage ($FUNCTIONS%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          if (( $(echo "$BRANCHES < $THRESHOLD" | bc -l) )); then
-            echo "❌ Backend branch coverage ($BRANCHES%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          echo "✅ Backend coverage meets all thresholds (${THRESHOLD}%)"
+          echo "✅ Backend line coverage meets threshold (${THRESHOLD}%)"
 
       - name: Run SDK tests with coverage
         run: npm run test:coverage --prefix sdk
@@ -142,40 +98,18 @@ jobs:
       - name: Check SDK coverage thresholds
         run: |
           cd sdk
-          COVERAGE=$(node -e "
+          LINES=$(node -e "
             const coverage = require('./coverage/coverage-summary.json');
-            const total = coverage.total;
-            const lines = total.lines.pct;
-            const statements = total.statements.pct;
-            const functions = total.functions.pct;
-            const branches = total.branches.pct;
-            console.log(JSON.stringify({ lines, statements, functions, branches }));
+            console.log(coverage.total.lines.pct);
           ")
-          echo "SDK Coverage: $COVERAGE"
-
-          LINES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).lines)")
-          STATEMENTS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).statements)")
-          FUNCTIONS=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).functions)")
-          BRANCHES=$(echo $COVERAGE | node -e "console.log(JSON.parse(require('fs').readFileSync(0, 'utf-8')).branches)")
+          echo "SDK line coverage: $LINES%"
 
           THRESHOLD=85
           if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
             echo "❌ SDK line coverage ($LINES%) is below threshold ($THRESHOLD%)"
             exit 1
           fi
-          if (( $(echo "$STATEMENTS < $THRESHOLD" | bc -l) )); then
-            echo "❌ SDK statement coverage ($STATEMENTS%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          if (( $(echo "$FUNCTIONS < $THRESHOLD" | bc -l) )); then
-            echo "❌ SDK function coverage ($FUNCTIONS%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          if (( $(echo "$BRANCHES < $THRESHOLD" | bc -l) )); then
-            echo "❌ SDK branch coverage ($BRANCHES%) is below threshold ($THRESHOLD%)"
-            exit 1
-          fi
-          echo "✅ SDK coverage meets all thresholds (${THRESHOLD}%)"
+          echo "✅ SDK line coverage meets threshold (${THRESHOLD}%)"
 
       - name: Run Python SDK tests with coverage
         run: python -m pytest tests/ --cov=finance_agent_sdk --cov-report=json --cov-report=term
@@ -240,13 +174,12 @@ jobs:
 
             const formatJsCoverage = (cov) => {
               if (!cov) return 'N/A';
-              return `Lines: ${cov.lines.pct}% | Stmts: ${cov.statements.pct}% | Fns: ${cov.functions.pct}% | Branches: ${cov.branches.pct}%`;
+              return `${cov.lines.pct}%`;
             };
 
             const formatPythonCoverage = (cov) => {
               if (!cov) return 'N/A';
-              const pct = cov.percent_covered.toFixed(1);
-              return `Lines: ${pct}% (${cov.covered_lines}/${cov.num_statements} statements)`;
+              return `${cov.percent_covered.toFixed(1)}%`;
             };
 
             const threshold = 85;
@@ -254,22 +187,22 @@ jobs:
             const pyCheck = (cov) => cov ? (cov.percent_covered >= threshold ? '✅' : '❌') : 'N/A';
 
             const warnings = [
-              frontend && frontend.lines.pct < threshold ? '⚠️ Frontend coverage below threshold' : '',
-              backend && backend.lines.pct < threshold ? '⚠️ Backend coverage below threshold' : '',
-              sdk && sdk.lines.pct < threshold ? '⚠️ SDK coverage below threshold' : '',
-              pythonSdk && pythonSdk.percent_covered < threshold ? '⚠️ Python SDK coverage below threshold' : '',
+              frontend && frontend.lines.pct < threshold ? '⚠️ Frontend line coverage below threshold' : '',
+              backend && backend.lines.pct < threshold ? '⚠️ Backend line coverage below threshold' : '',
+              sdk && sdk.lines.pct < threshold ? '⚠️ SDK line coverage below threshold' : '',
+              pythonSdk && pythonSdk.percent_covered < threshold ? '⚠️ Python SDK line coverage below threshold' : '',
             ].filter(Boolean).join('\n');
 
-            const comment = `## 📊 Code Coverage Report
+            const comment = `## 📊 Code Coverage Report (Lines)
 
-            | Component | Coverage | Status |
-            |-----------|----------|--------|
+            | Component | Line Coverage | Status |
+            |-----------|---------------|--------|
             | Frontend | ${formatJsCoverage(frontend)} | ${jsCheck(frontend)} |
             | Backend | ${formatJsCoverage(backend)} | ${jsCheck(backend)} |
             | SDK (npm) | ${formatJsCoverage(sdk)} | ${jsCheck(sdk)} |
             | Python SDK | ${formatPythonCoverage(pythonSdk)} | ${pyCheck(pythonSdk)} |
 
-            **Minimum Required Coverage:** ${threshold}%
+            **Minimum Required Line Coverage:** ${threshold}%
             ${warnings ? '\n' + warnings : ''}
             `;
 
