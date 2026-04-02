@@ -3,7 +3,11 @@
   "tenant-mode": "dedicated",
   "oauth2-configuration": {
     "token-validity": 43200,
-    "refresh-token-validity": 604800
+    "refresh-token-validity": 604800,
+    "redirect-uris": [
+      "https://*.hana.ondemand.com/**",
+      "https://*.cfapps.*.hana.ondemand.com/**"
+    ]
   },
   "scopes": [
     {

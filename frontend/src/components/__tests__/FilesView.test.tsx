@@ -195,47 +195,82 @@ describe('FilesView', () => {
     });
   });
 
-  it('should show confirmation bar when delete is requested', async () => {
+  it('should show confirmation bar when delete is requested via table button', async () => {
     (fileApi.getAllFiles as jest.Mock).mockResolvedValue({ files: mockFiles });
     (fileApi.deleteFile as jest.Mock).mockResolvedValue({});
 
+    const user = userEvent.setup();
     render(<FilesView isDarkMode={false} />);
 
     await waitFor(() => {
       expect(screen.getByText('document.pdf')).toBeInTheDocument();
     });
 
-    // We can't easily click the delete button in the table due to mock limitations
-    // But we can test that the component renders and is ready
-    expect(fileApi.getAllFiles).toHaveBeenCalledTimes(1);
+    const deleteButtons = screen.getAllByRole('button').filter(btn =>
+      btn.getAttribute('icon') === 'delete' || btn.getAttribute('design') === 'Negative'
+    );
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Are you sure you want to delete/)).toBeInTheDocument();
+    });
   });
 
   it('should delete file when confirmed', async () => {
     (fileApi.getAllFiles as jest.Mock).mockResolvedValue({ files: mockFiles });
     (fileApi.deleteFile as jest.Mock).mockResolvedValue({});
 
+    const user = userEvent.setup();
     render(<FilesView isDarkMode={false} />);
 
     await waitFor(() => {
       expect(screen.getByText('document.pdf')).toBeInTheDocument();
     });
 
-    // This test verifies the component is set up correctly for deletion
-    expect(fileApi.getAllFiles).toHaveBeenCalledTimes(1);
+    // Click the delete button in the table row
+    const deleteButtons = screen.getAllByRole('button').filter(btn =>
+      btn.getAttribute('icon') === 'delete' || btn.getAttribute('design') === 'Negative'
+    );
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeInTheDocument();
+    });
+
+    const confirmDeleteButton = screen.getByText('Delete');
+    await user.click(confirmDeleteButton);
+
+    await waitFor(() => {
+      expect(fileApi.deleteFile).toHaveBeenCalledWith('stored-123.pdf');
+      expect(screen.getByText('File "document.pdf" deleted successfully!')).toBeInTheDocument();
+    });
   });
 
-  it('should show success message after file deletion', async () => {
-    (fileApi.getAllFiles as jest.Mock).mockResolvedValue({ files: [] });
-    (fileApi.deleteFile as jest.Mock).mockResolvedValue({});
+  it('should cancel file deletion when cancel is clicked', async () => {
+    (fileApi.getAllFiles as jest.Mock).mockResolvedValue({ files: mockFiles });
 
+    const user = userEvent.setup();
     render(<FilesView isDarkMode={false} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Upload File')).toBeInTheDocument();
+      expect(screen.getByText('document.pdf')).toBeInTheDocument();
     });
 
-    // The component is ready to handle deletion
-    expect(fileApi.getAllFiles).toHaveBeenCalledTimes(1);
+    const deleteButtons = screen.getAllByRole('button').filter(btn =>
+      btn.getAttribute('icon') === 'delete' || btn.getAttribute('design') === 'Negative'
+    );
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cancel')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Cancel'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Are you sure you want to delete/)).not.toBeInTheDocument();
+    });
+    expect(fileApi.deleteFile).not.toHaveBeenCalled();
   });
 
   it('should show error message when deletion fails', async () => {
@@ -243,14 +278,28 @@ describe('FilesView', () => {
     (fileApi.getAllFiles as jest.Mock).mockResolvedValue({ files: mockFiles });
     (fileApi.deleteFile as jest.Mock).mockRejectedValue(new Error('Delete failed'));
 
+    const user = userEvent.setup();
     render(<FilesView isDarkMode={false} />);
 
     await waitFor(() => {
       expect(screen.getByText('document.pdf')).toBeInTheDocument();
     });
 
-    // Component is set up for error handling
-    expect(fileApi.getAllFiles).toHaveBeenCalledTimes(1);
+    const deleteButtons = screen.getAllByRole('button').filter(btn =>
+      btn.getAttribute('icon') === 'delete' || btn.getAttribute('design') === 'Negative'
+    );
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalledWith('Error deleting file:', expect.any(Error));
+      expect(screen.getByText('Failed to delete file. Please try again.')).toBeInTheDocument();
+    });
 
     consoleError.mockRestore();
   });

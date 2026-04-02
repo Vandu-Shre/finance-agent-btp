@@ -1,5 +1,5 @@
 import { FinanceAgent, initializeVectorStore, indexDocumentFromBuffer, searchDocuments } from '../agent/index.js';
-import { persist } from './db.service.js';
+import { prisma } from './db.service.js';
 
 export interface Message {
   id: string;
@@ -126,27 +126,22 @@ export class ChatService {
   private createNewSession(): ChatSession {
     const sessionId = this.generateSessionId();
     const createdAt = new Date().toISOString();
-    persist(
-      'INSERT INTO sessions (id, created_at) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING',
-      [sessionId, createdAt]
-    );
+    prisma.session.create({ data: { id: sessionId, createdAt: new Date(createdAt) } })
+      .catch((err: Error) => console.error('DB persist session failed:', err.message));
     return { sessionId, messages: [], isAgentTyping: false, createdAt };
   }
 
   private persistMessage(message: Message): void {
-    persist(
-      `INSERT INTO messages (id, session_id, text, sender, timestamp, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (id) DO NOTHING`,
-      [
-        message.id,
-        message.sessionId,
-        message.text,
-        message.sender,
-        message.timestamp,
-        message.metadata ? JSON.stringify(message.metadata) : null,
-      ]
-    );
+    prisma.message.create({
+      data: {
+        id: message.id,
+        sessionId: message.sessionId,
+        text: message.text,
+        sender: message.sender,
+        timestamp: new Date(message.timestamp),
+        metadata: message.metadata ? JSON.stringify(message.metadata) : null,
+      },
+    }).catch((err: Error) => console.error('DB persist message failed:', err.message));
   }
 
   private generateSessionId(): string {

@@ -36,11 +36,24 @@ export const ShellBar = ({ children, primaryTitle, startButton, profile, onProfi
     {children}
   </div>
 );
-export const SideNavigation = ({ children, collapsed, onSelectionChange, style, ...props }: any) => (
-  <nav style={style} {...props} onClick={onSelectionChange}>
-    {children}
-  </nav>
+export const Icon = ({ name, style, ...props }: any) => (
+  <ui5-icon name={name} style={style} {...props} />
 );
+
+export const SideNavigation = ({ children, collapsed, onSelectionChange, style, ...props }: any) => {
+  const handleClick = (e: any) => {
+    if (!onSelectionChange) return;
+    const item = (e.target as HTMLElement).closest('[data-key]') as HTMLElement;
+    if (item) {
+      onSelectionChange({ detail: { item } });
+    }
+  };
+  return (
+    <nav style={style} {...props} onClick={handleClick}>
+      {children}
+    </nav>
+  );
+};
 export const SideNavigationItem = ({ text, icon, selected, ...props }: any) => (
   <div {...props} data-selected={selected ? 'true' : 'false'}>
     {text}
@@ -61,7 +74,7 @@ export const AnalyticalTable = ({ columns, data, visibleRows, minRows, ...props 
           {columns.map((col: any, colIndex: number) => (
             <td key={colIndex}>
               {col.Cell ? (
-                <col.Cell row={{ row: { original: row, index: rowIndex } }} />
+                <col.Cell row={{ original: row, index: rowIndex }} />
               ) : (
                 row[col.accessor]
               )}

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { FileList } from '../FileList';
 import { FileInfo } from '../../api';
 
@@ -95,5 +96,43 @@ describe('FileList', () => {
     );
     const listContainer = container.firstChild as HTMLElement;
     expect(listContainer).toHaveStyle({ backgroundColor: '#f5f5f5' });
+  });
+
+  it('should call onDeleteFile with storedName and fileName when delete button is clicked', async () => {
+    const handleDelete = jest.fn();
+    const user = userEvent.setup();
+
+    render(
+      <FileList
+        files={mockFiles}
+        isLoading={false}
+        onDeleteFile={handleDelete}
+        isDarkMode={false}
+      />
+    );
+
+    const deleteButtons = screen.getAllByRole('button');
+    await user.click(deleteButtons[0]);
+
+    expect(handleDelete).toHaveBeenCalledWith('stored-123.pdf', 'document.pdf');
+  });
+
+  it('should call onDeleteFile for second file when its delete button is clicked', async () => {
+    const handleDelete = jest.fn();
+    const user = userEvent.setup();
+
+    render(
+      <FileList
+        files={mockFiles}
+        isLoading={false}
+        onDeleteFile={handleDelete}
+        isDarkMode={false}
+      />
+    );
+
+    const deleteButtons = screen.getAllByRole('button');
+    await user.click(deleteButtons[1]);
+
+    expect(handleDelete).toHaveBeenCalledWith('stored-456.xlsx', 'spreadsheet.xlsx');
   });
 });

@@ -1,20 +1,31 @@
 // Mock db.service before importing file.service
+const mockFileCreate = jest.fn().mockResolvedValue({});
+const mockFileFindMany = jest.fn().mockResolvedValue([]);
+const mockFileFindFirst = jest.fn().mockResolvedValue(null);
+const mockFileDelete = jest.fn().mockResolvedValue({});
+
 jest.mock('../../services/db.service.js', () => ({
-  query: jest.fn(),
-  persist: jest.fn(),
+  prisma: {
+    file: {
+      create: mockFileCreate,
+      findMany: mockFileFindMany,
+      findFirst: mockFileFindFirst,
+      delete: mockFileDelete,
+    },
+  },
 }));
 
 import { FileService } from '../../services/file.service.js';
-import { query, persist } from '../../services/db.service.js';
-
-const mockQuery = query as jest.Mock;
-const mockPersist = persist as jest.Mock;
 
 describe('FileService', () => {
   let fileService: FileService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFileCreate.mockResolvedValue({});
+    mockFileFindMany.mockResolvedValue([]);
+    mockFileFindFirst.mockResolvedValue(null);
+    mockFileDelete.mockResolvedValue({});
     fileService = new FileService();
   });
 
@@ -81,13 +92,13 @@ describe('FileService', () => {
 
       fileService.processUploadedFile(mockFile);
 
-      expect(mockPersist).not.toHaveBeenCalled();
-      expect(mockQuery).not.toHaveBeenCalled();
+      expect(mockFileCreate).not.toHaveBeenCalled();
+      expect(mockFileFindMany).not.toHaveBeenCalled();
     });
   });
 
   describe('saveUpload', () => {
-    it('should call persist with correct INSERT statement', () => {
+    it('should call prisma.file.create with correct data', () => {
       const mockFile = {
         originalname: 'report.pdf',
         mimetype: 'application/pdf',
@@ -96,16 +107,21 @@ describe('FileService', () => {
 
       fileService.saveUpload(mockFile, 'stored-report.pdf', 'session-123');
 
-      expect(mockPersist).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO files'),
-        expect.arrayContaining(['session-123', 'report.pdf', 'stored-report.pdf', 'application/pdf', 2048])
-      );
+      expect(mockFileCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          sessionId: 'session-123',
+          fileName: 'report.pdf',
+          storedName: 'stored-report.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 2048,
+        }),
+      });
     });
   });
 
   describe('getAllFiles', () => {
     it('should return empty array when no files in DB', async () => {
-      mockQuery.mockResolvedValue([]);
+      mockFileFindMany.mockResolvedValue([]);
 
       const result = await fileService.getAllFiles();
 
@@ -113,9 +129,9 @@ describe('FileService', () => {
     });
 
     it('should map DB rows to FileInfo objects', async () => {
-      mockQuery.mockResolvedValue([
-        { file_name: 'report.pdf', stored_name: '123-report.pdf', size_bytes: 2048, upload_date: new Date('2024-01-15') },
-        { file_name: 'data.csv', stored_name: '456-data.csv', size_bytes: 1024, upload_date: new Date('2024-01-16') },
+      mockFileFindMany.mockResolvedValue([
+        { fileName: 'report.pdf', storedName: '123-report.pdf', sizeBytes: 2048, uploadDate: new Date('2024-01-15') },
+        { fileName: 'data.csv', storedName: '456-data.csv', sizeBytes: 1024, uploadDate: new Date('2024-01-16') },
       ]);
 
       const result = await fileService.getAllFiles();
@@ -126,8 +142,8 @@ describe('FileService', () => {
     });
 
     it('should handle files without extension', async () => {
-      mockQuery.mockResolvedValue([
-        { file_name: 'README', stored_name: '789-README', size_bytes: 512, upload_date: new Date() },
+      mockFileFindMany.mockResolvedValue([
+        { fileName: 'README', storedName: '789-README', sizeBytes: 512, uploadDate: new Date() },
       ]);
 
       const result = await fileService.getAllFiles();
@@ -138,7 +154,7 @@ describe('FileService', () => {
 
   describe('deleteFile', () => {
     it('should return not found when file does not exist in DB', async () => {
-      mockQuery.mockResolvedValue([]);
+      mockFileFindFirst.mockResolvedValue(null);
 
       const result = await fileService.deleteFile('non-existent.pdf');
 
@@ -147,29 +163,21 @@ describe('FileService', () => {
     });
 
     it('should delete file and return originalName on success', async () => {
-      mockQuery
-        .mockResolvedValueOnce([{ file_name: 'report.pdf' }])
-        .mockResolvedValueOnce([]);
+      mockFileFindFirst.mockResolvedValue({ fileName: 'report.pdf', storedName: 'stored-report.pdf' });
 
       const result = await fileService.deleteFile('stored-report.pdf');
 
       expect(result.success).toBe(true);
       expect(result.originalName).toBe('report.pdf');
-      expect(mockQuery).toHaveBeenCalledTimes(2);
+      expect(mockFileDelete).toHaveBeenCalledWith({ where: { storedName: 'stored-report.pdf' } });
     });
 
-    it('should issue DELETE query with correct stored name', async () => {
-      mockQuery
-        .mockResolvedValueOnce([{ file_name: 'test.txt' }])
-        .mockResolvedValueOnce([]);
+    it('should not call delete when file is not found', async () => {
+      mockFileFindFirst.mockResolvedValue(null);
 
-      await fileService.deleteFile('stored-test.txt');
+      await fileService.deleteFile('missing.pdf');
 
-      expect(mockQuery).toHaveBeenNthCalledWith(
-        2,
-        'DELETE FROM files WHERE stored_name = $1',
-        ['stored-test.txt']
-      );
+      expect(mockFileDelete).not.toHaveBeenCalled();
     });
   });
 
