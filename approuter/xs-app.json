@@ -13,14 +13,14 @@
       "target": "/api/files",
       "destination": "backend",
       "authenticationType": "xsuaa",
-      "csrfProtection": true
+      "csrfProtection": false
     },
     {
       "source": "^/api/files/(.*)$",
       "target": "/api/files/$1",
       "destination": "backend",
       "authenticationType": "xsuaa",
-      "csrfProtection": true
+      "csrfProtection": false
     },
     {
       "source": "^/api/(.*)$",
