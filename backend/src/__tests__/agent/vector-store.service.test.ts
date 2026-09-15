@@ -312,18 +312,11 @@ describe('Vector Store Service', () => {
     });
 
     it('should delete chunks via vectorStore.delete and log success', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
       await deleteDocumentByFilename('test.txt');
 
       expect(mockVectorStore.delete).toHaveBeenCalledWith({
         filter: { source: { $eq: 'test.txt' } },
       });
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Deleted chunks for document: test.txt')
-      );
-
-      consoleSpy.mockRestore();
     });
 
     it('should throw error if vector store not initialized', async () => {

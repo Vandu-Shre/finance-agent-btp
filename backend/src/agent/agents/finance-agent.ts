@@ -1,10 +1,6 @@
 import { AzureChatOpenAI } from '@langchain/openai';
-import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} from '@langchain/core/prompts';
-import { AgentExecutor, createToolCallingAgent } from '@langchain/core/agents';
-import { AIMessage, HumanMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { createAgent } from 'langchain';
 import { agentConfig } from '../config/index.js';
 import {
   createSearchTool,
@@ -12,10 +8,8 @@ import {
   compareTool,
   extractFinancialDataTool,
 } from '../tools/finance-tools.js';
+import { logger } from '../../lib/logger.js';
 
-/**
- * System prompt for the finance agent
- */
 const SYSTEM_PROMPT = `You are a helpful finance assistant with expertise in financial analysis and general knowledge.
 
 You have access to the following tools:
@@ -32,10 +26,10 @@ GUIDELINES:
 - If you genuinely do not know the answer and have no relevant documents, say so honestly.`;
 
 /**
- * Finance Agent — a real tool-calling agent backed by Azure OpenAI
+ * Finance Agent — tool-calling agent backed by Azure OpenAI
  */
 export class FinanceAgent {
-  private executor: AgentExecutor | null = null;
+  private agent: ReturnType<typeof createAgent> | null = null;
   private chatHistory: Array<HumanMessage | AIMessage> = [];
   private userIdRef: { value: string } = { value: 'default' };
 
@@ -47,10 +41,8 @@ export class FinanceAgent {
       azureOpenAIApiVersion: agentConfig.azure.apiVersion,
       azureOpenAIApiInstanceName: agentConfig.azure.instanceName,
       azureOpenAIApiDeploymentName: agentConfig.azure.deploymentName,
-      temperature: agentConfig.azure.temperature,
     });
 
-    // Pass userIdRef so the search tool reads the current userId on every invocation
     const tools = [
       createSearchTool(this.userIdRef),
       calculateTool,
@@ -58,56 +50,51 @@ export class FinanceAgent {
       extractFinancialDataTool,
     ];
 
-    const prompt = ChatPromptTemplate.fromMessages([
-      ['system', SYSTEM_PROMPT],
-      new MessagesPlaceholder('chat_history'),
-      ['human', '{input}'],
-      new MessagesPlaceholder('agent_scratchpad'),
-    ]);
-
-    const agent = createToolCallingAgent({ llm, tools, prompt });
-
-    this.executor = new AgentExecutor({
-      agent,
-      tools,
-      maxIterations: 6,
-      returnIntermediateSteps: false,
+    this.agent = createAgent({
+      model: llm,
+      tools: tools as any[],
+      systemPrompt: SYSTEM_PROMPT,
     });
   }
 
   async chat(input: string, _context?: string): Promise<string> {
-    if (!this.executor) {
+    if (!this.agent) {
       throw new Error('Agent not initialized. Call initialize() first.');
     }
 
     try {
-      const result = await this.executor.invoke({
-        input,
-        chat_history: this.chatHistory,
+      const result = await this.agent.invoke({
+        messages: [
+          ...this.chatHistory,
+          new HumanMessage(input),
+        ],
       });
 
-      const output: string = result.output ?? '';
+      const lastMessage = result.messages.at(-1);
+      const output: string = typeof lastMessage?.content === 'string'
+        ? lastMessage.content
+        : JSON.stringify(lastMessage?.content ?? '');
 
-      // Maintain rolling history (last 20 exchanges to stay within context limits)
       this.chatHistory.push(new HumanMessage(input));
       this.chatHistory.push(new AIMessage(output));
+
+      // Keep last 20 exchanges (40 messages)
       if (this.chatHistory.length > 40) {
         this.chatHistory = this.chatHistory.slice(-40);
       }
 
       return output;
     } catch (error) {
-      console.error('Error in agent chat:', error);
+      logger.error('Error in agent chat', { error: (error as Error).message, stack: (error as Error).stack });
       throw error;
     }
   }
 
   setUserId(userId: string): void {
-    // Mutating the ref is enough — createSearchTool reads it on every call
     this.userIdRef.value = userId;
-    if (!this.executor) {
+    if (!this.agent) {
       this.initialize(userId).catch(err =>
-        console.error('Failed to initialize agent:', err)
+        logger.error('Failed to initialize agent', { userId, error: (err as Error).message })
       );
     }
   }

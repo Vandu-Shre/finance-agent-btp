@@ -2,6 +2,7 @@ import express, { Request } from 'express';
 import expressWs from 'express-ws';
 import WebSocket from 'ws';
 import { getSessionForUser } from '../services/chat-session-manager.js';
+import { logger } from '../lib/logger.js';
 
 const router = express.Router();
 const wsInstance = expressWs(router as any);
@@ -17,16 +18,14 @@ wsRouter.ws('/', (ws: any, req: Request) => {
   const clientId = `client-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
   const chatService = getSessionForUser(userId);
 
-  console.log(`WebSocket client connected: ${clientId}, user: ${userId}`);
-
-  // Route events from this user's ChatService to this WebSocket connection
+  logger.info('WebSocket client connected', { clientId, userId });
   chatService.setBroadcastCallback((event: string, data: any) => {
     try {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ event, data }));
       }
     } catch (error) {
-      console.error(`Error sending WebSocket event '${event}' to client ${clientId}:`, error);
+      logger.error('Error sending WebSocket event', { event, clientId, userId, error: (error as Error).message });
     }
   });
 
@@ -39,7 +38,7 @@ wsRouter.ws('/', (ws: any, req: Request) => {
   ws.on('message', (data: string) => {
     try {
       const payload = JSON.parse(data);
-      console.log('Received WebSocket message:', payload);
+      logger.debug('WebSocket message received', { clientId, action: payload.action, userId });
       switch (payload.action) {
         case 'sendMessage':
           if (!payload.text?.trim()) {
@@ -66,18 +65,18 @@ wsRouter.ws('/', (ws: any, req: Request) => {
           send(ws, 'error', { error: 'Unknown action' });
       }
     } catch (error) {
-      console.error('Error processing WebSocket message:', error);
+      logger.error('Error processing WebSocket message', { clientId, userId, error: (error as Error).message });
       send(ws, 'error', { error: 'Failed to process message' });
     }
   });
 
   ws.on('close', () => {
-    console.log(`WebSocket client disconnected: ${clientId}`);
+    logger.info('WebSocket client disconnected', { clientId, userId });
     // Clear the broadcast callback so stale connections don't receive events
     chatService.setBroadcastCallback(() => {});
   });
   ws.on('error', (error: any) => {
-    console.error(`WebSocket error for client ${clientId}:`, error);
+    logger.error('WebSocket error', { clientId, userId, error: (error as Error).message });
     chatService.setBroadcastCallback(() => {});
   });
 });

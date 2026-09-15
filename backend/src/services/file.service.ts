@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { prisma } from './db.service.js';
+import { logger } from '../lib/logger.js';
 
 export interface FileInfo {
   fileName: string;
@@ -40,7 +41,7 @@ export class FileService {
         mimeType: file.mimetype,
         sizeBytes: file.size,
       },
-    }).catch((err: Error) => console.error('DB persist file failed:', err.message));
+    }).catch((err: Error) => logger.error('DB persist file failed', { error: err.message }));
   }
 
   /**

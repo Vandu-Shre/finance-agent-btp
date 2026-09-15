@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { logger } from './lib/logger.js';
 import { initConfig } from './agent/config/index.js';
 import { initDb } from './services/db.service.js';
 
@@ -10,11 +11,11 @@ async function start(): Promise<void> {
 
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    logger.info('Server started', { port: PORT });
   });
 }
 
 start().catch((err) => {
-  console.error('Failed to start server:', err);
+  logger.error('Failed to start server', { error: (err as Error).message, stack: (err as Error).stack });
   process.exit(1);
 });

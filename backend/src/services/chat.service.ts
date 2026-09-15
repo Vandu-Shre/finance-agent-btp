@@ -1,5 +1,6 @@
 import { FinanceAgent, initializeVectorStore, indexDocumentFromBuffer } from '../agent/index.js';
 import { prisma } from './db.service.js';
+import { logger } from '../lib/logger.js';
 
 export interface Message {
   id: string;
@@ -43,23 +44,25 @@ export class ChatService {
     this.isInitializing = true;
     try {
       // Initialize the agent with the userId
-      console.log('🔄 Initializing Finance Agent...');
+      logger.info('Initializing Finance Agent', { userId: this.userId });
       this.agent = new FinanceAgent();
       await this.agent.initialize(this.userId);
-      console.log('✅ Finance Agent initialized successfully');
+      logger.info('Finance Agent initialized successfully', { userId: this.userId });
 
       // Initialize vector store
-      console.log('🔄 Initializing Vector Store...');
+      logger.info('Initializing Vector Store', { userId: this.userId });
       await initializeVectorStore();
       this.vectorStoreInitialized = true;
-      console.log('✅ Vector store initialized successfully');
+      logger.info('Vector store initialized successfully', { userId: this.userId });
 
       // Load existing files into chat history
       await this.loadExistingFiles();
     } catch (error) {
-      console.error('❌ Failed to initialize Finance Agent or Vector Store:', error);
-      console.error('Error details:', error instanceof Error ? error.message : error);
-      console.error('Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      logger.error('Failed to initialize Finance Agent or Vector Store', {
+        userId: this.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       this.agent = null;
       this.vectorStoreInitialized = false;
     } finally {
@@ -73,7 +76,7 @@ export class ChatService {
   async indexDocument(buffer: Buffer, filename: string, mimetype: string, userId: string): Promise<void> {
     // Wait for initialization if still in progress
     if (this.isInitializing) {
-      console.log('⏳ Waiting for vector store initialization...');
+      logger.debug('Waiting for vector store initialization', { userId });
       // Wait up to 30 seconds for initialization
       const maxWait = 30000;
       const startTime = Date.now();
@@ -88,9 +91,9 @@ export class ChatService {
 
     try {
       await indexDocumentFromBuffer(buffer, filename, mimetype, userId);
-      console.log(`✅ Document indexed: ${filename}`);
+      logger.info('Document indexed', { filename, userId });
     } catch (error) {
-      console.error(`❌ Failed to index document ${filename}:`, error);
+      logger.error('Failed to index document', { filename, userId, error: (error as Error).message, stack: (error as Error).stack });
       throw error;
     }
   }
@@ -129,7 +132,7 @@ export class ChatService {
     const sessionId = this.generateSessionId();
     const createdAt = new Date().toISOString();
     prisma.session.create({ data: { id: sessionId, createdAt: new Date(createdAt) } })
-      .catch((err: Error) => console.error('DB persist session failed:', err.message));
+      .catch((err: Error) => logger.error('DB persist session failed', { error: err.message }));
     return { sessionId, messages: [], isAgentTyping: false, createdAt };
   }
 
@@ -143,7 +146,7 @@ export class ChatService {
         timestamp: new Date(message.timestamp),
         metadata: message.metadata ? JSON.stringify(message.metadata) : null,
       },
-    }).catch((err: Error) => console.error('DB persist message failed:', err.message));
+    }).catch((err: Error) => logger.error('DB persist message failed', { error: err.message }));
   }
 
   private generateSessionId(): string {
@@ -159,7 +162,7 @@ export class ChatService {
   }
 
   addUserMessage(text: string): Message {
-    console.log(`addUserMessage called: "${text}"`);
+    logger.debug('addUserMessage called', { userId: this.userId, textLength: text.length });
     const message: Message = {
       id: this.generateMessageId(),
       sessionId: this.currentSession.sessionId,
@@ -170,7 +173,7 @@ export class ChatService {
 
     this.currentSession.messages.push(message);
     this.persistMessage(message);
-    console.log(`User message added to session, total messages: ${this.currentSession.messages.length}`);
+    logger.debug('User message added to session', { userId: this.userId, totalMessages: this.currentSession.messages.length });
 
     // Broadcast user message
     this.broadcast('userMessage', message);
@@ -180,7 +183,7 @@ export class ChatService {
     this.broadcast('typingStart', { isTyping: true });
 
     // Get agent response immediately (without artificial delay)
-    this.addAgentResponse(text, this.currentSession.sessionId);
+    this.addAgentResponse(text, this.userId);
 
     return message;
   }
@@ -213,7 +216,7 @@ export class ChatService {
       const responseText = await this.agent.chat(userMessage);
       this.sendAgentMessage(responseText);
     } catch (error) {
-      console.error('Error getting agent response:', error);
+      logger.error('Error getting agent response', { userId: this.userId, error: (error as Error).message, stack: (error as Error).stack });
       this.sendAgentMessage('Sorry, I encountered an error processing your message. Please try again.');
     }
   }
@@ -266,10 +269,10 @@ export class ChatService {
 
         this.currentSession.messages.push(systemMessage);
         this.broadcast('systemMessage', systemMessage);
-        console.log(`✅ Loaded ${files.length} existing file(s) for new session`);
+        logger.info('Loaded existing files for new session', { userId: this.userId, fileCount: files.length });
       }
     } catch (error) {
-      console.error('Error loading existing files:', error);
+      logger.error('Error loading existing files', { userId: this.userId, error: (error as Error).message });
     }
   }
 
@@ -292,7 +295,7 @@ export class ChatService {
     this.currentSession.messages.push(systemMessage);
     this.persistMessage(systemMessage);
     this.broadcast('systemMessage', systemMessage);
-    console.log(`📄 File uploaded message added: ${fileName}`);
+    logger.info('File uploaded message added', { fileName, userId: this.userId });
   }
 
   /**
@@ -314,7 +317,7 @@ export class ChatService {
     this.currentSession.messages.push(systemMessage);
     this.persistMessage(systemMessage);
     this.broadcast('systemMessage', systemMessage);
-    console.log(`🗑️ File deleted message added: ${fileName}`);
+    logger.info('File deleted message added', { fileName, userId: this.userId });
   }
 
   getCurrentSession(): ChatSession {

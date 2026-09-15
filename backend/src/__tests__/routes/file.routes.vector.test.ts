@@ -312,7 +312,8 @@ describe('File Routes - Vector Store Integration', () => {
 
   describe('Error Handling', () => {
     it('should log indexing errors without failing upload', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const { logger } = await import('../../lib/logger.js');
+      const errSpy = jest.spyOn(logger, 'error').mockImplementation(() => logger);
 
       (mockChatSvc.indexDocument as jest.Mock).mockRejectedValueOnce(
         new Error('Indexing error')
@@ -323,12 +324,12 @@ describe('File Routes - Vector Store Integration', () => {
         .attach('file', Buffer.from('Test'), 'test.txt')
         .expect(200);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to index document:',
-        expect.any(Error)
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to index document'),
+        expect.objectContaining({ filename: 'test.txt' })
       );
 
-      consoleSpy.mockRestore();
+      errSpy.mockRestore();
     });
   });
 });

@@ -8,6 +8,7 @@ import { agentConfig } from '../config/index.js';
 import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { logger } from '../../lib/logger.js';
 
 let vectorStore: Chroma | null = null;
 const CHROMA_CONNECTION_TIMEOUT_MS = 10_000;
@@ -18,7 +19,7 @@ function createEmbeddings(): AzureOpenAIEmbeddings {
     azureOpenAIApiKey: agentConfig.azure.apiKey,
     azureOpenAIApiInstanceName: agentConfig.azure.instanceName,
     azureOpenAIApiDeploymentName: agentConfig.azure.embeddingDeploymentName,
-    azureOpenAIApiVersion: agentConfig.azure.apiVersion,
+    azureOpenAIApiVersion: agentConfig.azure.embeddingApiVersion,
   });
 }
 
@@ -47,8 +48,7 @@ async function connectToChroma(): Promise<CloudClient> {
     CHROMA_CONNECTION_TIMEOUT_MS,
     `Connection timeout after ${CHROMA_CONNECTION_TIMEOUT_MS / 1000} seconds`
   );
-  console.log('✅ Chroma Cloud connection successful');
-  console.log(`✅ Ready to connect to collection "${agentConfig.chroma.collectionName}"`);
+  logger.info('Chroma Cloud connection successful', { collection: agentConfig.chroma.collectionName });
   return chromaClient;
 }
 
@@ -57,10 +57,11 @@ async function connectToChroma(): Promise<CloudClient> {
  */
 export async function initializeVectorStore(): Promise<void> {
   try {
-    console.log(`🌐 Connecting to Chroma Cloud`);
-    console.log(`   Tenant: ${agentConfig.chroma.tenant}`);
-    console.log(`   Database: ${agentConfig.chroma.database}`);
-    console.log(`   Collection: ${agentConfig.chroma.collectionName}`);
+    logger.info('Connecting to Chroma Cloud', {
+      tenant: agentConfig.chroma.tenant,
+      database: agentConfig.chroma.database,
+      collection: agentConfig.chroma.collectionName,
+    });
     const embeddings = createEmbeddings();
     const chromaClient = await connectToChroma();
     vectorStore = new Chroma(embeddings, {
@@ -68,9 +69,9 @@ export async function initializeVectorStore(): Promise<void> {
       index: chromaClient,
       collectionMetadata: { 'hnsw:space': 'cosine' },
     });
-    console.log('✅ Vector store connected to Chroma Cloud successfully');
+    logger.info('Vector store connected to Chroma Cloud successfully');
   } catch (error) {
-    console.error('❌ Failed to initialize vector store:', error);
+    logger.error('Failed to initialize vector store', { error: (error as Error).message, stack: (error as Error).stack });
     throw error;
   }
 }
@@ -115,9 +116,9 @@ export async function indexDocumentFromBuffer(
       metadata: { source: filename, mimetype, userId, chunkIndex: index, totalChunks: chunks.length, indexedAt: new Date().toISOString() },
     }));
     await vectorStore.addDocuments(documents);
-    console.log(`Successfully indexed ${documents.length} chunks from ${filename}`);
+    logger.info('Document indexed', { filename, chunks: documents.length, userId });
   } catch (error) {
-    console.error(`Failed to index document ${filename}:`, error);
+    logger.error('Failed to index document', { filename, userId, error: (error as Error).message, stack: (error as Error).stack });
     throw error;
   }
 }
@@ -132,10 +133,12 @@ export async function searchDocuments(query: string, k: number = 4, userId?: str
 
   try {
     const filter = userId ? { userId: { $eq: userId } } : undefined;
+    logger.debug('Searching documents', { query, k, userId, hasFilter: !!filter });
     const results = await vectorStore.similaritySearch(query, k, filter);
+    logger.debug('Search results', { count: results.length, query, userId });
     return results;
   } catch (error) {
-    console.error('Failed to search documents:', error);
+    logger.error('Failed to search documents', { error: (error as Error).message });
     throw error;
   }
 }
@@ -149,9 +152,9 @@ export async function deleteDocumentByFilename(filename: string): Promise<void> 
   }
   try {
     await vectorStore.delete({ filter: { source: { $eq: filename } } });
-    console.log(`✅ Deleted chunks for document: ${filename}`);
+    logger.info('Deleted chunks for document', { filename });
   } catch (error) {
-    console.error(`Failed to delete chunks for ${filename}:`, error);
+    logger.error('Failed to delete chunks for document', { filename, error: (error as Error).message });
     throw error;
   }
 }

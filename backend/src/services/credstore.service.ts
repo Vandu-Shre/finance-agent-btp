@@ -2,6 +2,7 @@ import { createPrivateKey } from 'crypto';
 import { request as httpsRequest } from 'https';
 import { URL } from 'url';
 import { compactDecrypt } from 'jose';
+import { logger } from '../lib/logger.js';
 
 interface CredstoreBinding {
   url: string;
@@ -98,7 +99,7 @@ export async function getCredential(namespace: string, name: string): Promise<st
   try {
     return await fetchCredential(binding, namespace, name);
   } catch (error) {
-    console.error(`❌ Failed to fetch credential '${name}' from Credential Store:`, error instanceof Error ? error.message : error);
+    logger.error('Failed to fetch credential from Credential Store', { name, error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }
@@ -107,19 +108,19 @@ export async function loadCredentials(namespace: string): Promise<void> {
   const binding = getBinding();
 
   if (!binding) {
-    console.log('ℹ️  No Credential Store binding found, using environment variables');
+    logger.info('No Credential Store binding found, using environment variables');
     return;
   }
 
-  console.log('🔐 Loading credentials from BTP Credential Store...');
+  logger.info('Loading credentials from BTP Credential Store');
 
   for (const [credName, envVar] of Object.entries(CREDENTIAL_MAP)) {
     try {
       const value = await fetchCredential(binding, namespace, credName);
       process.env[envVar] = value;
-      console.log(`✅ Loaded ${envVar} from Credential Store`);
+      logger.info('Loaded credential from Credential Store', { envVar });
     } catch (error) {
-      console.error(`❌ Failed to load ${envVar} from Credential Store:`, error instanceof Error ? error.message : error);
+      logger.error('Failed to load credential from Credential Store', { envVar, error: error instanceof Error ? error.message : String(error) });
     }
   }
 }

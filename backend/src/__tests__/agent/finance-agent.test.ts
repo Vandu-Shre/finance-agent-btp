@@ -7,63 +7,44 @@ process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME = 'test-embedding-deployment'
 process.env.CHROMA_API_KEY = 'test-chroma-key';
 process.env.TEMPERATURE = '0.7';
 
+import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import { FinanceAgent } from '../../agent/agents/finance-agent.js';
 
-// Mock LangChain modules
+// ── Mock LangChain modules ──────────────────────────────────────────────────
+
+const mockAgentInvoke = jest.fn();
+
 jest.mock('@langchain/openai', () => ({
-  AzureChatOpenAI: jest.fn().mockImplementation(() => ({
-    pipe: jest.fn().mockReturnThis(),
+  AzureChatOpenAI: jest.fn().mockImplementation(() => ({})),
+}));
+
+jest.mock('langchain', () => ({
+  createAgent: jest.fn().mockImplementation(() => ({
+    invoke: mockAgentInvoke,
   })),
 }));
 
-jest.mock('@langchain/core/prompts', () => ({
-  ChatPromptTemplate: {
-    fromMessages: jest.fn().mockReturnValue({
-      pipe: jest.fn().mockReturnThis(),
-    }),
-  },
+jest.mock('../../agent/tools/finance-tools.js', () => ({
+  createSearchTool: jest.fn().mockReturnValue({ name: 'search_documents' }),
+  calculateTool: { name: 'calculate' },
+  compareTool: { name: 'compare_values' },
+  extractFinancialDataTool: { name: 'extract_financial_data' },
 }));
 
-jest.mock('@langchain/core/output_parsers', () => ({
-  StringOutputParser: jest.fn().mockImplementation(() => ({})),
-}));
+// ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('FinanceAgent', () => {
   let agent: FinanceAgent;
-  let mockChainInvoke: jest.Mock;
 
   beforeEach(() => {
-    // Reset mocks
-    jest.clearAllMocks();
-
-    // Create a mock for chain.invoke
-    mockChainInvoke = jest.fn();
-
-    // Set up the chain mock to return an object with invoke method
-    const mockChain = {
-      invoke: mockChainInvoke,
-    };
-
-    // Make pipe() return the chain with invoke
-    const mockPipe = jest.fn().mockReturnValue(mockChain);
-
-    const AzureChatOpenAI = require('@langchain/openai').AzureChatOpenAI;
-    const ChatPromptTemplate = require('@langchain/core/prompts').ChatPromptTemplate;
-    const StringOutputParser = require('@langchain/core/output_parsers').StringOutputParser;
-
-    // Set up the full mock chain
-    AzureChatOpenAI.mockImplementation(() => ({}));
-
-    ChatPromptTemplate.fromMessages.mockReturnValue({
-      pipe: jest.fn().mockImplementation(() => ({
-        pipe: jest.fn().mockReturnValue(mockChain),
-      })),
+    mockAgentInvoke.mockReset();
+    mockAgentInvoke.mockResolvedValue({
+      messages: [new AIMessage('AI response')],
     });
-
-    StringOutputParser.mockImplementation(() => ({}));
-
     agent = new FinanceAgent();
   });
+
+  // ── Initialization ────────────────────────────────────────────────────────
 
   describe('initialization', () => {
     it('should create a new agent instance', () => {
@@ -86,183 +67,188 @@ describe('FinanceAgent', () => {
       expect(typeof agent.initialize).toBe('function');
     });
 
-    it('should initialize Azure OpenAI and create chain', async () => {
-      const AzureChatOpenAI = require('@langchain/openai').AzureChatOpenAI;
-      const ChatPromptTemplate = require('@langchain/core/prompts').ChatPromptTemplate;
-      const StringOutputParser = require('@langchain/core/output_parsers').StringOutputParser;
+    it('should initialize Azure OpenAI and create agent', async () => {
+      const { AzureChatOpenAI } = require('@langchain/openai');
+      const { createAgent } = require('langchain');
 
-      await agent.initialize();
+      await agent.initialize('user-1');
 
-      expect(AzureChatOpenAI).toHaveBeenCalledWith({
-        azureOpenAIApiKey: expect.any(String),
-        azureOpenAIApiVersion: expect.any(String),
-        azureOpenAIApiInstanceName: expect.any(String),
-        azureOpenAIApiDeploymentName: expect.any(String),
-        temperature: expect.any(Number),
-      });
-      expect(ChatPromptTemplate.fromMessages).toHaveBeenCalled();
-      expect(StringOutputParser).toHaveBeenCalled();
+      expect(AzureChatOpenAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          azureOpenAIApiKey: expect.any(String),
+          azureOpenAIApiVersion: expect.any(String),
+          azureOpenAIApiInstanceName: expect.any(String),
+          azureOpenAIApiDeploymentName: expect.any(String),
+          temperature: expect.any(Number),
+        })
+      );
+      expect(createAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.anything(),
+          tools: expect.any(Array),
+          systemPrompt: expect.any(String),
+        })
+      );
     });
   });
 
+  // ── chat ──────────────────────────────────────────────────────────────────
+
   describe('chat', () => {
     it('should throw error if not initialized', async () => {
-      await expect(agent.chat('Hello')).rejects.toThrow(
-        'Agent not initialized'
-      );
+      await expect(agent.chat('Hello')).rejects.toThrow('Agent not initialized');
     });
 
-    it('should invoke chain with input and empty history', async () => {
-      mockChainInvoke.mockResolvedValue('AI response');
+    it('should invoke agent with input as HumanMessage and return output', async () => {
+      let capturedMessages: any[] = [];
+      mockAgentInvoke.mockImplementation((args: any) => {
+        capturedMessages = args.messages.map((m: any) => ({
+          type: m.constructor.name,
+          content: m.content,
+        }));
+        return Promise.resolve({ messages: [new AIMessage('AI response')] });
+      });
 
       await agent.initialize();
       const response = await agent.chat('Hello');
 
-      expect(mockChainInvoke).toHaveBeenCalledWith({
-        input: 'Hello',
-        chat_history: '',
-        context: expect.any(String),
-      });
+      expect(capturedMessages).toEqual([{ type: 'HumanMessage', content: 'Hello' }]);
       expect(response).toBe('AI response');
     });
 
-    it('should add messages to chat history', async () => {
-      mockChainInvoke.mockResolvedValue('AI response');
-
+    it('should add HumanMessage and AIMessage to chat history after a call', async () => {
       await agent.initialize();
       await agent.chat('Hello');
 
       const history = agent.getHistory();
       expect(history).toHaveLength(2);
-      expect(history[0]).toEqual({ role: 'User', content: 'Hello' });
-      expect(history[1]).toEqual({ role: 'Assistant', content: 'AI response' });
+      expect(history[0]).toBeInstanceOf(HumanMessage);
+      expect(history[1]).toBeInstanceOf(AIMessage);
+      expect((history[0] as HumanMessage).content).toBe('Hello');
+      expect((history[1] as AIMessage).content).toBe('AI response');
     });
 
-    it('should include previous chat history in subsequent calls', async () => {
-      mockChainInvoke
-        .mockResolvedValueOnce('First response')
-        .mockResolvedValueOnce('Second response');
+    it('should pass accumulated history on subsequent calls', async () => {
+      const capturedHistoryLengths: number[] = [];
+      let callCount = 0;
+      mockAgentInvoke.mockImplementation((args: any) => {
+        capturedHistoryLengths.push(args.messages.length);
+        return Promise.resolve({ messages: [new AIMessage(`Response ${++callCount}`)] });
+      });
 
       await agent.initialize();
       await agent.chat('First message');
       await agent.chat('Second message');
 
-      expect(mockChainInvoke).toHaveBeenNthCalledWith(2, {
-        input: 'Second message',
-        chat_history: 'User: First message\nAssistant: First response',
-        context: expect.any(String),
-      });
+      // First call: 1 message (the human input only — history empty)
+      // Second call: 3 messages (HumanMessage + AIMessage from first + new HumanMessage)
+      expect(capturedHistoryLengths[0]).toBe(1);
+      expect(capturedHistoryLengths[1]).toBe(3);
     });
 
-    it('should format chat history correctly with multiple exchanges', async () => {
-      mockChainInvoke
-        .mockResolvedValueOnce('Response 1')
-        .mockResolvedValueOnce('Response 2')
-        .mockResolvedValueOnce('Response 3');
+    it('should accumulate history across multiple exchanges', async () => {
+      const capturedHistoryLengths: number[] = [];
+      let callCount = 0;
+      mockAgentInvoke.mockImplementation((args: any) => {
+        capturedHistoryLengths.push(args.messages.length);
+        return Promise.resolve({ messages: [new AIMessage(`Response ${++callCount}`)] });
+      });
 
       await agent.initialize();
       await agent.chat('Message 1');
       await agent.chat('Message 2');
       await agent.chat('Message 3');
 
-      expect(mockChainInvoke).toHaveBeenNthCalledWith(3, {
-        input: 'Message 3',
-        chat_history:
-          'User: Message 1\nAssistant: Response 1\nUser: Message 2\nAssistant: Response 2',
-        context: expect.any(String),
-      });
+      expect(capturedHistoryLengths[0]).toBe(1);
+      expect(capturedHistoryLengths[1]).toBe(3);
+      expect(capturedHistoryLengths[2]).toBe(5);
     });
 
-    it('should handle errors from chain invocation', async () => {
-      const error = new Error('API Error');
-      mockChainInvoke.mockRejectedValue(error);
+    it('should handle errors from agent invocation', async () => {
+      mockAgentInvoke.mockRejectedValue(new Error('API Error'));
 
       await agent.initialize();
-
       await expect(agent.chat('Hello')).rejects.toThrow('API Error');
     });
 
-    it('should log errors when chain invocation fails', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-      const error = new Error('API Error');
-      mockChainInvoke.mockRejectedValue(error);
+    it('should log errors via logger when agent invocation fails', async () => {
+      const { logger } = await import('../../lib/logger.js');
+      const errSpy = jest.spyOn(logger, 'error').mockImplementation(() => logger);
 
+      mockAgentInvoke.mockRejectedValue(new Error('API Error'));
       await agent.initialize();
 
       try {
         await agent.chat('Hello');
-      } catch (e) {
-        // Expected to throw
+      } catch {
+        // expected
       }
 
-      expect(consoleSpy).toHaveBeenCalledWith('Error in agent chat:', error);
-      consoleSpy.mockRestore();
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error in agent chat'),
+        expect.objectContaining({ error: 'API Error' })
+      );
+      errSpy.mockRestore();
     });
   });
+
+  // ── history management ────────────────────────────────────────────────────
 
   describe('history management', () => {
     it('should return empty array initially', () => {
       expect(agent.getHistory()).toEqual([]);
     });
 
-    it('should clear chat history on reset', () => {
-      // Manually add some history for testing
-      (agent as any).chatHistory = [
-        { role: 'User', content: 'Test' },
-        { role: 'Assistant', content: 'Response' },
-      ];
-
+    it('should clear chat history on reset', async () => {
+      await agent.initialize();
+      await agent.chat('Hello');
       expect(agent.getHistory()).toHaveLength(2);
 
       agent.resetHistory();
       expect(agent.getHistory()).toHaveLength(0);
     });
 
-    it('should return a copy of the history', () => {
-      (agent as any).chatHistory = [
-        { role: 'User', content: 'Test' },
-      ];
+    it('should return a copy of the history', async () => {
+      await agent.initialize();
+      await agent.chat('Hello');
 
       const history1 = agent.getHistory();
       const history2 = agent.getHistory();
 
       expect(history1).toEqual(history2);
-      expect(history1).not.toBe(history2); // Different objects
+      expect(history1).not.toBe(history2);
     });
 
-    it('should not allow external modification of history', () => {
-      (agent as any).chatHistory = [
-        { role: 'User', content: 'Test' },
-      ];
+    it('should not allow external modification of history', async () => {
+      await agent.initialize();
+      await agent.chat('Hello');
 
       const history = agent.getHistory();
-      history.push({ role: 'Hacker', content: 'Injected' });
+      history.push(new HumanMessage('injected'));
 
-      const actualHistory = agent.getHistory();
-      expect(actualHistory).toHaveLength(1); // Not 2
+      expect(agent.getHistory()).toHaveLength(2);
     });
 
-    it('should format history correctly', () => {
-      (agent as any).chatHistory = [
-        { role: 'User', content: 'Question' },
-        { role: 'Assistant', content: 'Answer' },
-      ];
+    it('should contain HumanMessage and AIMessage instances', async () => {
+      await agent.initialize();
+      await agent.chat('Question');
 
       const history = agent.getHistory();
-      expect(history[0]?.role).toBe('User');
-      expect(history[1]?.role).toBe('Assistant');
+      expect(history[0]).toBeInstanceOf(HumanMessage);
+      expect(history[1]).toBeInstanceOf(AIMessage);
     });
 
-    it('should handle multiple conversations', () => {
-      (agent as any).chatHistory = [
-        { role: 'User', content: 'First' },
-        { role: 'Assistant', content: 'First response' },
-        { role: 'User', content: 'Second' },
-        { role: 'Assistant', content: 'Second response' },
-      ];
+    it('should handle multiple conversations', async () => {
+      let callCount = 0;
+      mockAgentInvoke.mockImplementation(() =>
+        Promise.resolve({ messages: [new AIMessage(`Response ${++callCount}`)] })
+      );
 
-      const history = agent.getHistory();
-      expect(history).toHaveLength(4);
+      await agent.initialize();
+      await agent.chat('First');
+      await agent.chat('Second');
+
+      expect(agent.getHistory()).toHaveLength(4);
     });
   });
 });

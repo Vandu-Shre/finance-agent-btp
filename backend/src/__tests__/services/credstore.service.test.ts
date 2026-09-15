@@ -80,15 +80,16 @@ describe('Credstore Service', () => {
   describe('loadCredentials - no binding', () => {
     it('should return early and log when VCAP_SERVICES is not set', async () => {
       delete process.env.VCAP_SERVICES;
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const { logger } = await import('../../lib/logger.js');
+      const logSpy = jest.spyOn(logger, 'info').mockImplementation(() => logger);
 
       await loadCredentials('finance-agent');
 
       expect(https.request).not.toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining('No Credential Store binding found')
       );
-      consoleSpy.mockRestore();
+      logSpy.mockRestore();
     });
 
     it('should return early when credstore service is absent from VCAP_SERVICES', async () => {
@@ -204,14 +205,15 @@ describe('Credstore Service', () => {
       });
       mockHttpsResponse(200, JSON.stringify({ value: Buffer.from('val').toString('base64') }));
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const { logger } = await import('../../lib/logger.js');
+      const errSpy = jest.spyOn(logger, 'error').mockImplementation(() => logger);
       await loadCredentials('finance-agent');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to load AZURE_OPENAI_API_KEY'),
-        expect.any(String)
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to load credential'),
+        expect.objectContaining({ envVar: 'AZURE_OPENAI_API_KEY' })
       );
-      consoleSpy.mockRestore();
+      errSpy.mockRestore();
     });
 
     it('should not throw when server returns non-ok response', async () => {

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { importSPKI, jwtVerify } from 'jose';
+import { logger } from '../lib/logger.js';
 
 export interface XsuaaUser {
   sub: string;
@@ -96,7 +97,7 @@ export async function xsuaaAuth(req: Request, res: Response, next: NextFunction)
   try {
     keyInfo = await getVerificationKey();
   } catch (err) {
-    console.error('Failed to load XSUAA verification key:', err);
+    logger.error('Failed to load XSUAA verification key', { error: (err as Error).message });
     res.status(500).json({ error: 'Authentication service unavailable' });
     return;
   }
@@ -147,7 +148,7 @@ export async function xsuaaAuth(req: Request, res: Response, next: NextFunction)
 
     next();
   } catch (err) {
-    console.error('JWT validation failed:', err);
+    logger.error('JWT validation failed', { error: (err as Error).message });
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

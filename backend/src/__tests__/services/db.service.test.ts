@@ -32,26 +32,32 @@ describe('db.service', () => {
 
   describe('initDb', () => {
     it('calls $connect and logs success', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const { logger } = await import('../../lib/logger.js');
+      const logSpy = jest.spyOn(logger, 'info').mockImplementation(() => logger);
       const { initDb } = await import('../../services/db.service.js');
 
       await initDb();
 
       expect(mockConnect).toHaveBeenCalledTimes(1);
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Database ready'));
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Database ready')
+      );
+      logSpy.mockRestore();
     });
 
     it('throws and logs error when $connect fails', async () => {
       mockConnect.mockRejectedValue(new Error('connection refused'));
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const { logger } = await import('../../lib/logger.js');
+      const errSpy = jest.spyOn(logger, 'error').mockImplementation(() => logger);
       const { initDb } = await import('../../services/db.service.js');
 
       await expect(initDb()).rejects.toThrow('connection refused');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(errSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to connect'),
-        expect.any(Error)
+        expect.objectContaining({ error: 'connection refused' })
       );
+      errSpy.mockRestore();
     });
   });
 

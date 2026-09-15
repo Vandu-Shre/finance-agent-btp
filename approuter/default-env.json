@@ -1,0 +1,10 @@
+{
+  "destinations": [
+    {
+      "name": "backend",
+      "url": "http://localhost:3001",
+      "forwardAuthToken": false
+    }
+  ],
+  "UAA_SERVICE_NAME": "dummy-uaa"
+}

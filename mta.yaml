@@ -61,7 +61,7 @@ modules:
     build-parameters:
       builder: custom
       commands:
-        - npm install
+        - npm install --legacy-peer-deps
         - npm run db:generate:prod
         - npm run build
       build-result: .
@@ -78,10 +78,11 @@ modules:
     properties:
       NODE_ENV: production
       # Azure OpenAI Configuration (non-secret)
-      AZURE_OPENAI_INSTANCE_NAME: ra-foundry-exp
-      AZURE_OPENAI_DEPLOYMENT_NAME: gpt-5-nano
-      AZURE_OPENAI_API_VERSION: 2025-01-01-preview
+      AZURE_OPENAI_INSTANCE_NAME: oratio-openai
+      AZURE_OPENAI_DEPLOYMENT_NAME: o4-mini
+      AZURE_OPENAI_API_VERSION: 2024-12-01-preview
       AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME: text-embedding-3-small
+      AZURE_OPENAI_EMBEDDING_API_VERSION: 2024-02-01
       # Chroma Cloud Configuration (non-secret)
       CHROMA_TENANT: 331db5df-e7e9-41fb-b02e-6b2d3ada34ad
       CHROMA_DATABASE: dev

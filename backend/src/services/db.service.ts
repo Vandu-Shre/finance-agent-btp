@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { logger } from '../lib/logger.js';
 
 function buildDatabaseUrl(): string {
   if (process.env.NODE_ENV === 'production') {
@@ -39,9 +40,9 @@ export const prisma = new PrismaClient();
 export async function initDb(): Promise<void> {
   try {
     await prisma.$connect();
-    console.log('✅ Database ready');
+    logger.info('Database ready');
   } catch (error) {
-    console.error('❌ Failed to connect to database:', error);
+    logger.error('Failed to connect to database', { error: (error as Error).message, stack: (error as Error).stack });
     throw error;
   }
 }

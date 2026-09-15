@@ -2,6 +2,8 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { searchDocuments } from '../services/vector-store.service.js';
 
+type CompareValue = { label: string; amount: number };
+
 /**
  * Tool: Search uploaded documents for relevant context.
  * Accepts a userId ref object so the tool always uses the agent's current userId
@@ -51,7 +53,7 @@ export const calculateTool = new DynamicStructuredTool({
       .describe('A safe mathematical expression to evaluate (no code, only math)'),
   }),
   func: async ({ expression }) => {
-    const sanitized = expression.trim();
+    const sanitized = (expression as string).trim();
     if (!/^[\d\s+\-*/().,%eMath]+$/.test(sanitized.replace(/Math\.\w+/g, 'Math.fn'))) {
       return 'Error: Expression contains disallowed characters. Only arithmetic and Math.* functions are permitted.';
     }
@@ -89,22 +91,25 @@ export const compareTool = new DynamicStructuredTool({
       .describe('List of labelled values to compare (at least 2)'),
   }),
   func: async ({ values }) => {
-    const sorted = [...values].sort((a, b) => b.amount - a.amount);
-    const highest = sorted[0];
-    const lowest = sorted[sorted.length - 1];
+    const typedValues = values as CompareValue[];
+    const sorted = [...typedValues].sort((a, b) => b.amount - a.amount);
+    const highest = sorted[0] as CompareValue;
+    const lowest = sorted[sorted.length - 1] as CompareValue;
 
     const lines: string[] = ['Comparison:'];
-    values.forEach(v => {
+    typedValues.forEach(v => {
       lines.push(`  ${v.label}: ${v.amount.toLocaleString()}`);
     });
 
-    if (values.length === 2) {
-      const diff = values[0].amount - values[1].amount;
+    if (typedValues.length === 2) {
+      const first = typedValues[0] as CompareValue;
+      const second = typedValues[1] as CompareValue;
+      const diff = first.amount - second.amount;
       const pct =
-        values[1].amount !== 0
-          ? ((diff / Math.abs(values[1].amount)) * 100).toFixed(2)
+        second.amount !== 0
+          ? ((diff / Math.abs(second.amount)) * 100).toFixed(2)
           : 'N/A';
-      lines.push(`\nDifference (${values[0].label} vs ${values[1].label}): ${diff.toLocaleString()} (${pct}%)`);
+      lines.push(`\nDifference (${first.label} vs ${second.label}): ${diff.toLocaleString()} (${pct}%)`);
     }
 
     lines.push(`\nHighest: ${highest.label} (${highest.amount.toLocaleString()})`);
@@ -126,26 +131,27 @@ export const extractFinancialDataTool = new DynamicStructuredTool({
     text: z.string().describe('The text passage to extract financial data from'),
   }),
   func: async ({ text }) => {
+    const textStr = text as string;
     const results: string[] = ['Extracted financial data:'];
 
     // Currency amounts: $1,234.56 or USD 1,234 etc.
-    const currencyMatches = text.match(
+    const currencyMatches = textStr.match(
       /(?:USD|EUR|GBP|JPY|CHF|\$|€|£|¥)?\s*[\d,]+(?:\.\d+)?(?:\s*(?:million|billion|trillion|M|B|K))?/gi
     );
     if (currencyMatches && currencyMatches.length > 0) {
       results.push(`\nMonetary figures found (${currencyMatches.length}):`);
-      const unique = [...new Set(currencyMatches.map(m => m.trim()).filter(m => m.length > 1))];
-      unique.slice(0, 10).forEach(m => results.push(`  - ${m}`));
+      const unique = [...new Set(currencyMatches.map((m: string) => m.trim()).filter((m: string) => m.length > 1))];
+      unique.slice(0, 10).forEach((m: string) => results.push(`  - ${m}`));
     }
 
     // Percentages
-    const pctMatches = text.match(/[\d.]+\s*%/g);
+    const pctMatches = textStr.match(/[\d.]+\s*%/g);
     if (pctMatches && pctMatches.length > 0) {
       results.push(`\nPercentages: ${[...new Set(pctMatches)].join(', ')}`);
     }
 
     // Dates / fiscal periods
-    const dateMatches = text.match(
+    const dateMatches = textStr.match(
       /(?:Q[1-4]\s+\d{4}|FY\s*\d{2,4}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4}|\d{4})/gi
     );
     if (dateMatches && dateMatches.length > 0) {

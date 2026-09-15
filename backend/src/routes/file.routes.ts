@@ -3,6 +3,7 @@ import multer from 'multer';
 import fileService from '../services/file.service.js';
 import { getSessionForUser } from '../services/chat-session-manager.js';
 import { deleteDocumentByFilename } from '../agent/index.js';
+import { logger } from '../lib/logger.js';
 
 const router = express.Router();
 
@@ -26,14 +27,14 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
       await chatService.indexDocument(req.file.buffer, req.file.originalname, req.file.mimetype, userId);
       fileService.saveUpload(req.file, fileInfo.storedName, userId);
       chatService.addFileUploadedMessage(req.file.originalname);
-      console.log(`✅ File uploaded and indexed: ${req.file.originalname}`);
+      logger.info('File uploaded and indexed', { filename: req.file.originalname, storedName: fileInfo.storedName, userId, requestId: req.requestId });
     } catch (indexError) {
-      console.error('Failed to index document:', indexError);
+      logger.error('Failed to index document', { filename: req.file.originalname, userId, requestId: req.requestId, error: (indexError as Error).message });
     }
 
     res.json({ message: 'File uploaded and indexed successfully', file: fileInfo });
   } catch (error) {
-    console.error('Upload error:', error);
+    logger.error('Upload error', { userId: req.user?.sub, requestId: req.requestId, error: (error as Error).message });
     res.status(500).json({ error: 'Failed to upload file' });
   }
 });
@@ -45,7 +46,7 @@ router.get('/', async (req: Request, res: Response) => {
     const files = await fileService.getAllFiles(userId);
     res.json({ files });
   } catch (error) {
-    console.error('List files error:', error);
+    logger.error('List files error', { userId: req.user?.sub, requestId: req.requestId, error: (error as Error).message });
     res.status(500).json({ error: 'Failed to list files' });
   }
 });
@@ -68,9 +69,9 @@ router.delete('/:filename', async (req: Request, res: Response) => {
     if (result.originalName) {
       try {
         await deleteDocumentByFilename(result.originalName);
-        console.log(`✅ Chroma chunks deleted for: ${result.originalName}`);
+        logger.info('Chroma chunks deleted', { filename: result.originalName, userId, requestId: req.requestId });
       } catch (chromaErr) {
-        console.error('Failed to delete from Chroma:', chromaErr);
+        logger.error('Failed to delete from Chroma', { filename: result.originalName, userId, requestId: req.requestId, error: (chromaErr as Error).message });
       }
       const chatService = getSessionForUser(userId);
       chatService.addFileDeletedMessage(result.originalName);
@@ -78,7 +79,7 @@ router.delete('/:filename', async (req: Request, res: Response) => {
 
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
-    console.error('Delete error:', error);
+    logger.error('Delete error', { filename: req.params.filename, userId: req.user?.sub, requestId: req.requestId, error: (error as Error).message });
     res.status(500).json({ error: 'Failed to delete file' });
   }
 });

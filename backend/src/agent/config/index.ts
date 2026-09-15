@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 import { getCredential } from '../../services/credstore.service.js';
+import { logger } from '../../lib/logger.js';
 
 // Load environment variables
 config();
@@ -7,7 +8,8 @@ config();
 export const agentConfig = {
   azure: {
     apiKey: '',
-    apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-12-01-preview',
+    embeddingApiVersion: process.env.AZURE_OPENAI_EMBEDDING_API_VERSION || '2024-02-01',
     instanceName: process.env.AZURE_OPENAI_INSTANCE_NAME || '',
 
     // Chat/LLM Model - for generating responses and conversations
@@ -58,12 +60,12 @@ export async function initConfig(): Promise<void> {
     throw new Error('Chroma API key is required. Ensure it is stored in BTP Credential Store under "chroma-api-key".');
   }
 
-  console.log('✅ Using Chroma Cloud for persistent vector storage');
-  console.log('📝 Configuration loaded:');
-  console.log(`  - Chat Model: ${agentConfig.azure.deploymentName}`);
-  console.log(`  - Embedding Model: ${agentConfig.azure.embeddingDeploymentName}`);
-  console.log(`  - Azure OpenAI Instance Name: ${agentConfig.azure.instanceName}`);
-  console.log(`  - Chroma Tenant: ${agentConfig.chroma.tenant}`);
-  console.log(`  - Chroma Database: ${agentConfig.chroma.database}`);
-  console.log(`  - Chroma Collection: ${agentConfig.chroma.collectionName}`);
+  logger.info('Configuration loaded', {
+    chatModel: agentConfig.azure.deploymentName,
+    embeddingModel: agentConfig.azure.embeddingDeploymentName,
+    azureInstance: agentConfig.azure.instanceName,
+    chromaTenant: agentConfig.chroma.tenant,
+    chromaDatabase: agentConfig.chroma.database,
+    chromaCollection: agentConfig.chroma.collectionName,
+  });
 }
