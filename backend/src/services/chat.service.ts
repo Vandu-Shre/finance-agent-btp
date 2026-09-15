@@ -1,4 +1,4 @@
-import { FinanceAgent, initializeVectorStore, indexDocumentFromBuffer, searchDocuments } from '../agent/index.js';
+import { FinanceAgent, initializeVectorStore, indexDocumentFromBuffer } from '../agent/index.js';
 import { prisma } from './db.service.js';
 
 export interface Message {
@@ -40,10 +40,10 @@ export class ChatService {
 
     this.isInitializing = true;
     try {
-      // Initialize the agent
+      // Initialize the agent with the current session id as the default userId
       console.log('🔄 Initializing Finance Agent...');
       this.agent = new FinanceAgent();
-      await this.agent.initialize();
+      await this.agent.initialize(this.currentSession.sessionId);
       console.log('✅ Finance Agent initialized successfully');
 
       // Initialize vector store
@@ -198,50 +198,6 @@ export class ChatService {
     this.broadcast('typingStop', { isTyping: false });
   }
 
-  private async retrieveContext(userMessage: string, userId: string): Promise<string> {
-    if (!this.vectorStoreInitialized) {
-      console.log('⚠️ Vector store not initialized');
-      return '';
-    }
-    try {
-      const docs = await searchDocuments(userMessage, 4, userId);
-      if (docs && docs.length > 0) {
-        console.log(`✅ Retrieved ${docs.length} relevant documents for context`);
-        const context = docs.map((doc, i) =>
-          `Document ${i + 1} (Source: ${doc.metadata?.source ?? 'Unknown source'}):\n${doc.pageContent}`
-        ).join('\n\n---\n\n');
-        const msg: Message = {
-          id: this.generateMessageId(),
-          sessionId: this.currentSession.sessionId,
-          text: `Found ${docs.length} relevant document chunk${docs.length > 1 ? 's' : ''} to answer your question`,
-          sender: 'system',
-          timestamp: new Date().toISOString(),
-          metadata: { type: 'file-added', fileCount: docs.length },
-        };
-        this.currentSession.messages.push(msg);
-        this.persistMessage(msg);
-        this.broadcast('systemMessage', msg);
-        return context;
-      }
-      console.log('⚠️ No relevant documents found in vector store');
-      const noDocsMsg: Message = {
-        id: this.generateMessageId(),
-        sessionId: this.currentSession.sessionId,
-        text: 'No relevant documents found for this question',
-        sender: 'system',
-        timestamp: new Date().toISOString(),
-        metadata: { type: 'file-deleted' },
-      };
-      this.currentSession.messages.push(noDocsMsg);
-      this.persistMessage(noDocsMsg);
-      this.broadcast('systemMessage', noDocsMsg);
-      return '';
-    } catch (error) {
-      console.error('❌ Error retrieving documents from vector store:', error);
-      return '';
-    }
-  }
-
   private async addAgentResponse(userMessage: string, userId: string): Promise<void> {
     try {
       if (!this.agent) {
@@ -250,8 +206,9 @@ export class ChatService {
         );
         return;
       }
-      const context = await this.retrieveContext(userMessage, userId);
-      const responseText = await this.agent.chat(userMessage, context);
+      // Keep the agent's search tool scoped to the correct user
+      this.agent.setUserId(userId);
+      const responseText = await this.agent.chat(userMessage);
       this.sendAgentMessage(responseText);
     } catch (error) {
       console.error('Error getting agent response:', error);

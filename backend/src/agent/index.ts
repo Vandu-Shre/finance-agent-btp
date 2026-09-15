@@ -8,4 +8,9 @@ export {
   searchDocuments,
   deleteDocumentByFilename
 } from './services/vector-store.service.js';
-
+export {
+  createSearchTool,
+  calculateTool,
+  compareTool,
+  extractFinancialDataTool,
+} from './tools/finance-tools.js';
