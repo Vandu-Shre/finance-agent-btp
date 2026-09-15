@@ -1,14 +1,14 @@
 import request from 'supertest';
 import express from 'express';
 
-jest.mock('../../services/chat.service.js', () => ({
+jest.mock('../../services/chat-session-manager.js', () => ({
   __esModule: true,
-  default: {
+  getSessionForUser: jest.fn().mockReturnValue({
     indexDocument: jest.fn().mockResolvedValue(undefined),
     isVectorStoreReady: jest.fn().mockReturnValue(true),
     addFileUploadedMessage: jest.fn(),
     addFileDeletedMessage: jest.fn(),
-  },
+  }),
 }));
 
 jest.mock('../../services/file.service.js', () => ({

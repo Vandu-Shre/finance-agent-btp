@@ -7,8 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fileRoutes from './routes/file.routes.js';
 import chatRoutes from './routes/chat.routes.js';
-import chatService from './services/chat.service.js';
-import { xsuaaAuth } from './middleware/auth.js';
+import { xsuaaAuth, requireAppAccess } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +16,7 @@ const { app } = expressWs(express());
 
 app.use(express.json());
 app.use(xsuaaAuth);
+app.use(requireAppAccess);
 
 // Load OpenAPI specification
 const openApiPath = path.resolve(__dirname, '../../openapi.yaml');
@@ -62,15 +62,9 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
-  const initStatus = chatService.getInitializationStatus();
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    services: {
-      agent: initStatus.agentReady ? 'ready' : 'not ready',
-      vectorStore: initStatus.vectorStoreReady ? 'ready' : 'not ready',
-      initializing: initStatus.isInitializing,
-    }
   });
 });
 

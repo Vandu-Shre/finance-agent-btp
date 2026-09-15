@@ -58,6 +58,33 @@ async function getVerificationKey(): Promise<{ key: Awaited<ReturnType<typeof im
 }
 
 /**
+ * Express middleware that enforces the app-level scope (`<xsappname>.user`).
+ * Must be used after xsuaaAuth (which populates req.user and the cached xsappname).
+ *
+ * - No XSUAA binding (dev mode): dev-user bypasses the check.
+ * - Deployed: user must have the `<xsappname>.user` scope in their token.
+ */
+export async function requireAppAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ error: 'Unauthenticated' });
+    return;
+  }
+  // Dev mode bypass
+  if (user.sub === 'dev-user') {
+    next();
+    return;
+  }
+  // Use the xsappname cached by xsuaaAuth's getVerificationKey call
+  const requiredScope = _cachedXsappname ? `${_cachedXsappname}.user` : null;
+  if (!requiredScope || user.scopes.includes(requiredScope)) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: 'Insufficient permissions' });
+}
+
+/**
  * Express middleware that validates XSUAA JWT tokens.
  *
  * - Deployed (VCAP_SERVICES present): requires a valid Bearer token.

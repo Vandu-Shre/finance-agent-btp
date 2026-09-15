@@ -44,10 +44,10 @@ export class FileService {
   }
 
   /**
-   * Return all file records from the database.
+   * Return file records from the database belonging to the given user.
    */
-  async getAllFiles(): Promise<FileInfo[]> {
-    const rows = await prisma.file.findMany({ orderBy: { uploadDate: 'desc' } });
+  async getAllFiles(userId: string): Promise<FileInfo[]> {
+    const rows = await prisma.file.findMany({ where: { sessionId: userId }, orderBy: { uploadDate: 'desc' } });
     return rows.map((r: typeof rows[number]) => {
       const parts = r.fileName.split('.');
       const ext = parts.length > 1 ? parts.pop()?.toUpperCase() || 'Unknown' : 'Unknown';
@@ -62,11 +62,12 @@ export class FileService {
   }
 
   /**
-   * Delete a file record from the database by its stored name.
+   * Delete a file record from the database by its stored name, scoped to the given user.
    */
-  async deleteFile(storedName: string): Promise<{ success: boolean; error?: string; originalName?: string }> {
+  async deleteFile(storedName: string, userId: string): Promise<{ success: boolean; error?: string; originalName?: string }> {
     const file = await prisma.file.findFirst({ where: { storedName } });
     if (!file) return { success: false, error: 'File not found' };
+    if (file.sessionId !== userId) return { success: false, error: 'File not found' };
     await prisma.file.delete({ where: { storedName } });
     return { success: true, originalName: file.fileName };
   }

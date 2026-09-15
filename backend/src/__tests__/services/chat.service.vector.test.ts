@@ -17,6 +17,7 @@ jest.mock('../../services/file.service.js', () => ({
 jest.mock('../../agent/index.js', () => ({
   FinanceAgent: jest.fn().mockImplementation(() => ({
     initialize: jest.fn().mockResolvedValue(undefined),
+    setUserId: jest.fn(),
     chat: jest.fn().mockResolvedValue('Mocked agent response'),
   })),
   initializeVectorStore: jest.fn().mockResolvedValue(undefined),
@@ -31,7 +32,7 @@ describe('ChatService - Vector Store Integration', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    chatService = new ChatService();
+    chatService = new ChatService('test-user');
   });
 
   describe('Vector Store Initialization', () => {
@@ -54,7 +55,7 @@ describe('ChatService - Vector Store Integration', () => {
         new Error('Vector store initialization failed')
       );
 
-      const service = new ChatService();
+      const service = new ChatService('test-user-fail');
 
       // Wait for async initialization
       await flushPromises();
@@ -82,7 +83,7 @@ describe('ChatService - Vector Store Integration', () => {
     it('should throw error if vector store not initialized', async () => {
       (initializeVectorStore as jest.Mock).mockRejectedValueOnce(new Error('Init failed'));
 
-      const service = new ChatService();
+      const service = new ChatService('test-user-fail2');
       await flushPromises();
 
       const buffer = Buffer.from('Test content');
@@ -158,7 +159,7 @@ describe('ChatService - Vector Store Integration', () => {
     it('should return false when vector store initialization fails', async () => {
       (initializeVectorStore as jest.Mock).mockRejectedValueOnce(new Error('Failed'));
 
-      const service = new ChatService();
+      const service = new ChatService('test-user-fail3');
       await flushPromises();
 
       expect(service.isVectorStoreReady()).toBe(false);
@@ -187,28 +188,18 @@ describe('ChatService - Vector Store Integration', () => {
       await flushPromises();
     });
 
-    it('should add system message with doc count when documents are found', async () => {
-      (searchDocuments as jest.Mock).mockResolvedValueOnce([
-        { pageContent: 'Revenue was $5M', metadata: { source: 'report.pdf' } },
-        { pageContent: 'Costs were $3M', metadata: { source: 'report.pdf' } },
-      ]);
-
+    it('should respond to document-related queries via the agent', async () => {
+      // The agent (tool-calling) handles document search internally.
+      // ChatService does not call searchDocuments directly.
       chatService.addUserMessage('What is the revenue?');
       await flushPromises();
 
       const messages = chatService.getAllMessages();
-      const systemMsg = messages.find(
-        (m) => m.sender === 'system' && m.text.includes('Found 2 relevant document')
-      );
-      expect(systemMsg).toBeDefined();
-      expect(systemMsg?.metadata?.fileCount).toBe(2);
+      const agentMsg = messages.find((m) => m.sender === 'agent');
+      expect(agentMsg).toBeDefined();
     });
 
-    it('should broadcast systemMessage when documents are found', async () => {
-      (searchDocuments as jest.Mock).mockResolvedValueOnce([
-        { pageContent: 'Q1 profit was $1M', metadata: { source: 'q1.pdf' } },
-      ]);
-
+    it('should broadcast agentMessage after processing document query', async () => {
       const mockBroadcast = jest.fn();
       chatService.setBroadcastCallback(mockBroadcast);
 
@@ -216,8 +207,8 @@ describe('ChatService - Vector Store Integration', () => {
       await flushPromises();
 
       expect(mockBroadcast).toHaveBeenCalledWith(
-        'systemMessage',
-        expect.objectContaining({ text: expect.stringContaining('Found 1 relevant document') })
+        'agentMessage',
+        expect.objectContaining({ sender: 'agent' })
       );
     });
   });
@@ -243,7 +234,7 @@ describe('ChatService - Vector Store Integration', () => {
         new Error('Vector store failed')
       );
 
-      const service = new ChatService();
+      const service = new ChatService('test-user-vs-fail');
       await flushPromises();
 
       // Chat should still work even if vector store failed

@@ -12,7 +12,7 @@ import WebSocket from 'ws';
 import express from 'express';
 import expressWs from 'express-ws';
 
-// ─── Mock chatService before importing routes ────────────────────────────────
+// ─── Mock chat-session-manager before importing routes ───────────────────────
 // Variables must start with "mock" for jest to allow them in the hoisted factory.
 
 const mockSetBroadcastCallback = jest.fn();
@@ -30,16 +30,18 @@ const mockGetCurrentSession = jest.fn().mockReturnValue({
   createdAt: '2024-01-01T00:00:00.000Z',
 });
 
-jest.mock('../../services/chat.service.js', () => ({
+const mockChatServiceInstance = {
+  setBroadcastCallback: mockSetBroadcastCallback,
+  addUserMessage: mockAddUserMessage,
+  getAllMessages: mockGetAllMessages,
+  isAgentTyping: mockIsAgentTyping,
+  startNewSession: mockStartNewSession,
+  getCurrentSession: mockGetCurrentSession,
+};
+
+jest.mock('../../services/chat-session-manager.js', () => ({
   __esModule: true,
-  default: {
-    setBroadcastCallback: mockSetBroadcastCallback,
-    addUserMessage: mockAddUserMessage,
-    getAllMessages: mockGetAllMessages,
-    isAgentTyping: mockIsAgentTyping,
-    startNewSession: mockStartNewSession,
-    getCurrentSession: mockGetCurrentSession,
-  },
+  getSessionForUser: jest.fn().mockReturnValue(mockChatServiceInstance),
 }));
 
 import chatRoutes from '../../routes/chat.routes.js';
@@ -160,11 +162,10 @@ function connect(): Promise<WsConnection> {
 
 describe('chat.routes – WebSocket', () => {
   describe('Module initialisation', () => {
-    it('registers a broadcast callback on chatService at import time', () => {
-      // The chat.routes module calls setBroadcastCallback when first imported.
-      // We verify that the registered value is a function.
-      expect(mockSetBroadcastCallback).toBeDefined();
-      expect(typeof mockSetBroadcastCallback).toBe('function');
+    it('getSessionForUser is defined and callable', () => {
+      // The routes module uses getSessionForUser per-connection, not at import time.
+      const { getSessionForUser } = require('../../services/chat-session-manager.js');
+      expect(typeof getSessionForUser).toBe('function');
     });
   });
 

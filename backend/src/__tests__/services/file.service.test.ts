@@ -123,7 +123,7 @@ describe('FileService', () => {
     it('should return empty array when no files in DB', async () => {
       mockFileFindMany.mockResolvedValue([]);
 
-      const result = await fileService.getAllFiles();
+      const result = await fileService.getAllFiles('user-1');
 
       expect(result).toEqual([]);
     });
@@ -134,11 +134,19 @@ describe('FileService', () => {
         { fileName: 'data.csv', storedName: '456-data.csv', sizeBytes: 1024, uploadDate: new Date('2024-01-16') },
       ]);
 
-      const result = await fileService.getAllFiles();
+      const result = await fileService.getAllFiles('user-1');
 
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ fileName: 'report.pdf', storedName: '123-report.pdf', type: 'PDF', size: '2 KB' });
       expect(result[1]).toMatchObject({ fileName: 'data.csv', storedName: '456-data.csv', type: 'CSV', size: '1 KB' });
+    });
+
+    it('should filter by userId (sessionId)', async () => {
+      await fileService.getAllFiles('user-abc');
+
+      expect(mockFileFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { sessionId: 'user-abc' } })
+      );
     });
 
     it('should handle files without extension', async () => {
@@ -146,7 +154,7 @@ describe('FileService', () => {
         { fileName: 'README', storedName: '789-README', sizeBytes: 512, uploadDate: new Date() },
       ]);
 
-      const result = await fileService.getAllFiles();
+      const result = await fileService.getAllFiles('user-1');
 
       expect(result[0]?.type).toBe('Unknown');
     });
@@ -156,26 +164,36 @@ describe('FileService', () => {
     it('should return not found when file does not exist in DB', async () => {
       mockFileFindFirst.mockResolvedValue(null);
 
-      const result = await fileService.deleteFile('non-existent.pdf');
+      const result = await fileService.deleteFile('non-existent.pdf', 'user-1');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('File not found');
     });
 
     it('should delete file and return originalName on success', async () => {
-      mockFileFindFirst.mockResolvedValue({ fileName: 'report.pdf', storedName: 'stored-report.pdf' });
+      mockFileFindFirst.mockResolvedValue({ fileName: 'report.pdf', storedName: 'stored-report.pdf', sessionId: 'user-1' });
 
-      const result = await fileService.deleteFile('stored-report.pdf');
+      const result = await fileService.deleteFile('stored-report.pdf', 'user-1');
 
       expect(result.success).toBe(true);
       expect(result.originalName).toBe('report.pdf');
       expect(mockFileDelete).toHaveBeenCalledWith({ where: { storedName: 'stored-report.pdf' } });
     });
 
+    it('should return not found when file belongs to a different user', async () => {
+      mockFileFindFirst.mockResolvedValue({ fileName: 'report.pdf', storedName: 'stored-report.pdf', sessionId: 'user-other' });
+
+      const result = await fileService.deleteFile('stored-report.pdf', 'user-1');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('File not found');
+      expect(mockFileDelete).not.toHaveBeenCalled();
+    });
+
     it('should not call delete when file is not found', async () => {
       mockFileFindFirst.mockResolvedValue(null);
 
-      await fileService.deleteFile('missing.pdf');
+      await fileService.deleteFile('missing.pdf', 'user-1');
 
       expect(mockFileDelete).not.toHaveBeenCalled();
     });

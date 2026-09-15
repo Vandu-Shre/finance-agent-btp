@@ -16,6 +16,7 @@ jest.mock('../../services/file.service.js', () => ({
 jest.mock('../../agent/index.js', () => ({
   FinanceAgent: jest.fn().mockImplementation(() => ({
     initialize: jest.fn().mockResolvedValue(undefined),
+    setUserId: jest.fn(),
     chat: jest.fn().mockImplementation((message: string) => {
       // Mock agent responses based on message content
       if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('hi')) {
@@ -40,7 +41,7 @@ describe('ChatService', () => {
   let chatService: ChatService;
 
   beforeEach(() => {
-    chatService = new ChatService();
+    chatService = new ChatService('test-user');
   });
 
   describe('Broadcast Callback', () => {
@@ -68,8 +69,8 @@ describe('ChatService', () => {
       // Wait for agent response (allow time for async agent call to complete)
       await flushPromises();
 
-      // Should broadcast: userMessage, typingStart, systemMessage (no docs), agentMessage, typingStop
-      expect(mockBroadcast).toHaveBeenCalledTimes(5);
+      // Should broadcast: userMessage, typingStart, agentMessage, typingStop
+      expect(mockBroadcast).toHaveBeenCalledTimes(4);
       expect(mockBroadcast).toHaveBeenCalledWith('agentMessage', expect.objectContaining({
         sender: 'agent'
       }));
@@ -203,10 +204,10 @@ describe('ChatService', () => {
       // Verify typing is false after agent responds
       expect(chatService.isAgentTyping()).toBe(false);
 
-      // Verify agent has responded (should have 3 messages: user + system (no docs) + agent)
+      // Verify agent has responded (should have 2 messages: user + agent)
       const messages = chatService.getAllMessages();
-      expect(messages.length).toBe(3);
-      expect(messages[2]?.sender).toBe('agent');
+      expect(messages.length).toBe(2);
+      expect(messages[1]?.sender).toBe('agent');
 
       // Wait more time to ensure typing stays false (user hasn't responded yet)
       await flushPromises();
@@ -359,7 +360,7 @@ describe('ChatService', () => {
         chat: jest.fn().mockRejectedValue(new Error('LLM service unavailable')),
       }));
 
-      const service = new ChatService();
+      const service = new ChatService('test-user-error');
       await flushPromises();
 
       service.addUserMessage('Hello');

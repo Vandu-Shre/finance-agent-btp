@@ -1,18 +1,23 @@
 import request from 'supertest';
 import express from 'express';
 import fileRoutes from '../../routes/file.routes';
-import chatService from '../../services/chat.service';
 
-// Mock the chat service
-jest.mock('../../services/chat.service', () => ({
+// Mock the chat session manager
+jest.mock('../../services/chat-session-manager.js', () => ({
   __esModule: true,
-  default: {
+  getSessionForUser: jest.fn().mockReturnValue({
     indexDocument: jest.fn().mockResolvedValue(undefined),
     isVectorStoreReady: jest.fn().mockReturnValue(true),
     addFileUploadedMessage: jest.fn(),
     addFileDeletedMessage: jest.fn(),
-  },
+  }),
 }));
+
+import { getSessionForUser } from '../../services/chat-session-manager.js';
+
+// The mock factory returns a static object for all calls to getSessionForUser.
+// Call it once here to get the reference we can use in assertions.
+const mockChatSvc = (getSessionForUser as jest.Mock)('');
 
 jest.mock('../../agent/index.js', () => ({
   deleteDocumentByFilename: jest.fn().mockResolvedValue(undefined),
@@ -40,7 +45,7 @@ jest.mock('../../services/file.service.js', () => ({
       mockFileStore.set(storedName, { fileName: file.originalname, storedName, type, size: '1 KB', uploadDate: '2024-01-01' });
     }),
     getAllFiles: jest.fn().mockImplementation(() => Promise.resolve(Array.from(mockFileStore.values()))),
-    deleteFile: jest.fn().mockImplementation((storedName: string) => {
+    deleteFile: jest.fn().mockImplementation((storedName: string, _userId: string) => {
       if (!mockFileStore.has(storedName)) return Promise.resolve({ success: false, error: 'File not found' });
       const entry = mockFileStore.get(storedName);
       mockFileStore.delete(storedName);
@@ -96,7 +101,7 @@ describe('File Routes - Vector Store Integration', () => {
         }),
       });
 
-      expect(chatService.indexDocument).toHaveBeenCalledWith(
+      expect(mockChatSvc.indexDocument).toHaveBeenCalledWith(
         expect.any(Buffer),
         'test.txt',
         'text/plain',
@@ -115,7 +120,7 @@ describe('File Routes - Vector Store Integration', () => {
       expect(response.body.file.fileName).toBe('data.csv');
       expect(response.body.file.type).toBe('CSV');
 
-      expect(chatService.indexDocument).toHaveBeenCalledWith(
+      expect(mockChatSvc.indexDocument).toHaveBeenCalledWith(
         expect.any(Buffer),
         'data.csv',
         'text/csv',
@@ -134,7 +139,7 @@ describe('File Routes - Vector Store Integration', () => {
       expect(response.body.file.fileName).toBe('data.json');
       expect(response.body.file.type).toBe('JSON');
 
-      expect(chatService.indexDocument).toHaveBeenCalledWith(
+      expect(mockChatSvc.indexDocument).toHaveBeenCalledWith(
         expect.any(Buffer),
         'data.json',
         'application/json',
@@ -143,7 +148,7 @@ describe('File Routes - Vector Store Integration', () => {
     });
 
     it('should still upload file even if indexing fails', async () => {
-      (chatService.indexDocument as jest.Mock).mockRejectedValueOnce(
+      (mockChatSvc.indexDocument as jest.Mock).mockRejectedValueOnce(
         new Error('Indexing failed')
       );
 
@@ -156,7 +161,7 @@ describe('File Routes - Vector Store Integration', () => {
       expect(response.body.file).toBeDefined();
 
       // Should have attempted indexing
-      expect(chatService.indexDocument).toHaveBeenCalled();
+      expect(mockChatSvc.indexDocument).toHaveBeenCalled();
     });
 
     it('should return 400 if no file is provided', async () => {
@@ -166,7 +171,7 @@ describe('File Routes - Vector Store Integration', () => {
         error: 'No file uploaded',
       });
 
-      expect(chatService.indexDocument).not.toHaveBeenCalled();
+      expect(mockChatSvc.indexDocument).not.toHaveBeenCalled();
     });
 
     it('should handle large files within limit', async () => {
@@ -178,7 +183,7 @@ describe('File Routes - Vector Store Integration', () => {
         .expect(200);
 
       expect(response.body.file.size).toContain('MB');
-      expect(chatService.indexDocument).toHaveBeenCalled();
+      expect(mockChatSvc.indexDocument).toHaveBeenCalled();
     });
 
     it('should reject files exceeding size limit', async () => {
@@ -189,7 +194,7 @@ describe('File Routes - Vector Store Integration', () => {
         .attach('file', tooLarge, 'too-large.txt')
         .expect(500);
 
-      expect(chatService.indexDocument).not.toHaveBeenCalled();
+      expect(mockChatSvc.indexDocument).not.toHaveBeenCalled();
     });
 
     it('should handle files with special characters in filename', async () => {
@@ -199,7 +204,7 @@ describe('File Routes - Vector Store Integration', () => {
         .expect(200);
 
       expect(response.body.file.fileName).toBe('file (1) [test].txt');
-      expect(chatService.indexDocument).toHaveBeenCalledWith(
+      expect(mockChatSvc.indexDocument).toHaveBeenCalledWith(
         expect.any(Buffer),
         'file (1) [test].txt',
         'text/plain',
@@ -223,7 +228,7 @@ describe('File Routes - Vector Store Integration', () => {
         .attach('file', Buffer.from('Test'), 'test.txt')
         .expect(200);
 
-      const indexCall = (chatService.indexDocument as jest.Mock).mock.calls[0];
+      const indexCall = (mockChatSvc.indexDocument as jest.Mock).mock.calls[0];
       expect(indexCall[2]).toBe('text/plain'); // mimetype
     });
 
@@ -234,7 +239,7 @@ describe('File Routes - Vector Store Integration', () => {
         .attach('file', Buffer.from('Content'), 'test.txt')
         .expect(200);
 
-      expect(chatService.indexDocument).toHaveBeenCalledWith(
+      expect(mockChatSvc.indexDocument).toHaveBeenCalledWith(
         expect.any(Buffer),
         'test.txt',
         'text/plain',
@@ -248,7 +253,7 @@ describe('File Routes - Vector Store Integration', () => {
         .attach('file', Buffer.from('Content'), 'test.txt')
         .expect(200);
 
-      expect(chatService.indexDocument).toHaveBeenCalledWith(
+      expect(mockChatSvc.indexDocument).toHaveBeenCalledWith(
         expect.any(Buffer),
         'test.txt',
         'text/plain',
@@ -309,7 +314,7 @@ describe('File Routes - Vector Store Integration', () => {
     it('should log indexing errors without failing upload', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      (chatService.indexDocument as jest.Mock).mockRejectedValueOnce(
+      (mockChatSvc.indexDocument as jest.Mock).mockRejectedValueOnce(
         new Error('Indexing error')
       );
 

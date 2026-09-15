@@ -29,8 +29,10 @@ export class ChatService {
   private agent: FinanceAgent | null = null;
   private isInitializing: boolean = false;
   private vectorStoreInitialized: boolean = false;
+  private userId: string;
 
-  constructor() {
+  constructor(userId: string) {
+    this.userId = userId;
     this.currentSession = this.createNewSession();
     this.initializeAgent();
   }
@@ -40,10 +42,10 @@ export class ChatService {
 
     this.isInitializing = true;
     try {
-      // Initialize the agent with the current session id as the default userId
+      // Initialize the agent with the userId
       console.log('🔄 Initializing Finance Agent...');
       this.agent = new FinanceAgent();
-      await this.agent.initialize(this.currentSession.sessionId);
+      await this.agent.initialize(this.userId);
       console.log('✅ Finance Agent initialized successfully');
 
       // Initialize vector store
@@ -246,7 +248,7 @@ export class ChatService {
   private async loadExistingFiles(): Promise<void> {
     try {
       const { default: fileService } = await import('./file.service.js');
-      const files = await fileService.getAllFiles();
+      const files = await fileService.getAllFiles(this.userId);
 
       if (files.length > 0) {
         const fileNames = files.map(f => f.fileName).join(', ');
@@ -322,6 +324,3 @@ export class ChatService {
     };
   }
 }
-
-const chatService = new ChatService();
-export default chatService;

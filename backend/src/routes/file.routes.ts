@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import fileService from '../services/file.service.js';
-import chatService from '../services/chat.service.js';
+import { getSessionForUser } from '../services/chat-session-manager.js';
 import { deleteDocumentByFilename } from '../agent/index.js';
 
 const router = express.Router();
@@ -20,6 +20,7 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
 
     const fileInfo = fileService.processUploadedFile(req.file);
     const userId = req.user?.sub ?? 'anonymous';
+    const chatService = getSessionForUser(userId);
 
     try {
       await chatService.indexDocument(req.file.buffer, req.file.originalname, req.file.mimetype, userId);
@@ -38,9 +39,10 @@ router.post('/', upload.single('file'), async (req: Request, res: Response) => {
 });
 
 // List all files
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const files = await fileService.getAllFiles();
+    const userId = req.user?.sub ?? 'anonymous';
+    const files = await fileService.getAllFiles(userId);
     res.json({ files });
   } catch (error) {
     console.error('List files error:', error);
@@ -52,12 +54,13 @@ router.get('/', async (_req: Request, res: Response) => {
 router.delete('/:filename', async (req: Request, res: Response) => {
   try {
     const { filename } = req.params;
+    const userId = req.user?.sub ?? 'anonymous';
 
     if (!filename || typeof filename !== 'string') {
       return res.status(400).json({ error: 'Filename is required' });
     }
 
-    const result = await fileService.deleteFile(filename);
+    const result = await fileService.deleteFile(filename, userId);
     if (!result.success) {
       return res.status(404).json({ error: result.error });
     }
@@ -69,6 +72,7 @@ router.delete('/:filename', async (req: Request, res: Response) => {
       } catch (chromaErr) {
         console.error('Failed to delete from Chroma:', chromaErr);
       }
+      const chatService = getSessionForUser(userId);
       chatService.addFileDeletedMessage(result.originalName);
     }
 
